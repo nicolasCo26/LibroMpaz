@@ -1,7 +1,11 @@
 package com.librompaz.app.viewmodel
 
-import androidx.lifecycle.ViewModel
-import com.librompaz.app.data.MockData
+import android.app.Application
+import android.net.Uri
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.librompaz.app.data.local.AppDatabase
+import com.librompaz.app.data.repository.LibroMpazRepository
 import com.librompaz.app.model.Anotacion
 import com.librompaz.app.model.Asignatura
 import com.librompaz.app.model.Calificacion
@@ -17,71 +21,139 @@ import com.librompaz.app.model.ResumenCurso
 import com.librompaz.app.model.SesionClase
 import com.librompaz.app.model.TipoAnotacion
 import com.librompaz.app.model.Usuario
+import com.librompaz.app.recursosnativos.ExportadorCsv
+import com.librompaz.app.util.ahora
+import com.librompaz.app.util.hoy
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+
+/** Estado del formulario de login (patrón Guía 11: data class + StateFlow en el ViewModel). */
+data class LoginUiState(
+    val usuario: String = "",
+    val clave: String = "",
+    val errores: ErroresLogin = ErroresLogin(),
+    val ingresando: Boolean = false
+)
 
 /**
- * ViewModel único, compartido por todas las pantallas (se crea una sola vez en AppNavigation).
+ * VIEWMODEL único, compartido por todas las pantallas (se crea una sola vez en AppNavigation).
+ * Guarda el estado de las pantallas y decide QUÉ hacer (validar, guardar, calcular métricas).
+ * No sabe CÓMO se guardan los datos: eso es trabajo de LibroMpazRepository.
  *
- * ESTO ES UN ESQUELETO: las pantallas ya llaman a todas estas funciones, pero la lógica de
- * negocio del caso está vacía a propósito y marcada con TODO(equipo), citando el módulo de
- * Requerimientos_DSY1105-005 al que corresponde. Mientras no se implemente:
- *  - el login siempre rechaza (usar "Modo desarrollo" en la pantalla de login),
- *  - el docente ve todas las cargas (no solo las suyas),
- *  - guardar asistencia, clases, notas y anotaciones no hace nada,
- *  - las vistas de UTP, Inspectoría y Dirección no calculan métricas,
- *  - no se registra auditoría.
+ * Flujo de un dato: Pantalla (@Composable) -> ViewModel (valida) -> Repository -> DAO -> Room.
+ * Y de vuelta: Room emite un Flow -> el ViewModel lo expone como StateFlow -> la pantalla lo
+ * observa con collectAsState() y se redibuja sola.
  *
- * Regla de negocio transversal: TODA creación o modificación debe dejar un RegistroAuditoria
- * (usuario, fecha y hora) automático e inalterable. Implementarla en cada función que guarde.
+ * Es AndroidViewModel porque necesita un Context para abrir la base de datos y escribir el
+ * archivo del reporte.
  */
-class LibroMpazViewModel : ViewModel() {
+class LibroMpazViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val repository = LibroMpazRepository(AppDatabase.getInstance(application))
+
+    /** false mientras se pobla la base la primera vez (el login muestra un indicador de carga). */
+    private val _datosListos = MutableStateFlow(false)
+    val datosListos: StateFlow<Boolean> = _datosListos.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            repository.poblarSiVacia()
+            _datosListos.value = true
+        }
+    }
+
+    /**
+     * Convierte un Flow de Room en StateFlow. Eagerly: empieza a escuchar de inmediato y no se
+     * detiene, así .value siempre está al día (las funciones de abajo como cursoPorId() lo leen).
+     * Es seguro porque hay un solo ViewModel y la base es pequeña.
+     */
+    private fun <T> Flow<List<T>>.comoEstado(): StateFlow<List<T>> =
+        stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     // =====================================================================
-    // Módulo "Autenticación y alcance por rol"
+    // Módulo "Autenticación y alcance por rol" (RF-01, RF-02)
     // =====================================================================
 
     private val _usuarioActivo = MutableStateFlow<Usuario?>(null)
     val usuarioActivo: StateFlow<Usuario?> = _usuarioActivo.asStateFlow()
 
-    private val _errorLogin = MutableStateFlow<String?>(null)
-    val errorLogin: StateFlow<String?> = _errorLogin.asStateFlow()
+    private val _login = MutableStateFlow(LoginUiState())
+    val login: StateFlow<LoginUiState> = _login.asStateFlow()
+
+    // Al escribir se limpia el error de ese campo.
+    fun onUsuarioChange(valor: String) =
+        _login.update { it.copy(usuario = valor, errores = it.errores.copy(usuario = null, general = null)) }
+
+    fun onClaveChange(valor: String) =
+        _login.update { it.copy(clave = valor, errores = it.errores.copy(clave = null, general = null)) }
 
     /**
-     * TODO(equipo): autenticar contra MockData.usuarios (o el backend que confirme el CITT).
-     * Validar campos vacíos (patrón Guía 11). Si es correcto: dejar _usuarioActivo y devolver
-     * true (AppNavigation ya lleva a cada perfil a su pantalla). Si no: _errorLogin y false.
+     * Valida los campos y busca el usuario en Room. Si las credenciales son correctas, deja el
+     * usuario activo y llama a onIngresar(perfil): AppNavigation lleva a cada perfil a su panel.
      */
-    fun login(usuario: String, clave: String): Boolean {
-        _errorLogin.value = "Login sin implementar — ver TODO(equipo) en LibroMpazViewModel.login()."
-        return false
-    }
-
-    /**
-     * SOLO PARA DESARROLLO: entra con el primer usuario de prueba del perfil indicado, sin
-     * validar credenciales. TODO(equipo): eliminar esta función y los botones "Modo desarrollo".
-     */
-    fun entrarModoDesarrollo(perfil: Perfil) {
-        _usuarioActivo.value = MockData.usuarios.first { it.perfil == perfil }
-        _errorLogin.value = null
+    fun ingresar(onIngresar: (Perfil) -> Unit) {
+        val estado = _login.value
+        val errores = validarLogin(estado.usuario, estado.clave)
+        if (errores.hayErrores) {
+            _login.update { it.copy(errores = errores) }
+            return
+        }
+        viewModelScope.launch {
+            _login.update { it.copy(ingresando = true) }
+            val usuario = repository.buscarUsuario(estado.usuario.trim())
+            if (usuario == null || usuario.clave != estado.clave) {
+                // Mensaje genérico a propósito: no revela si el correo existe.
+                _login.update { it.copy(ingresando = false, errores = ErroresLogin(general = "Correo o clave incorrectos")) }
+                return@launch
+            }
+            _usuarioActivo.value = usuario
+            _login.value = LoginUiState()   // limpia el formulario: la clave no queda en memoria
+            onIngresar(usuario.perfil)
+        }
     }
 
     fun logout() {
         _usuarioActivo.value = null
-        _errorLogin.value = null
-        _cursoSeleccionadoId.value = null
-        _asignaturaSeleccionadaId.value = null
+        _login.value = LoginUiState()
+        seleccionarCurso(null)
     }
 
+    /**
+     * RBAC (RF-01): las cargas SOLO del docente autenticado. La consulta filtra por docenteId en
+     * SQL (AcademicoDao.cargasDe). flatMapLatest cambia de consulta cada vez que cambia el usuario.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val misCargas: StateFlow<List<CargaDocente>> = _usuarioActivo
+        .flatMapLatest { usuario ->
+            if (usuario?.perfil == Perfil.DOCENTE) repository.cargasDe(usuario.id) else flowOf(emptyList())
+        }
+        .comoEstado()
+
+    /** RBAC (RF-02): el docente solo registra en los cursos (y asignaturas) que tiene asignados. */
+    private fun tieneCarga(cursoId: String, asignaturaId: String? = null): Boolean =
+        _usuarioActivo.value?.perfil == Perfil.DOCENTE &&
+            misCargas.value.any { it.cursoId == cursoId && (asignaturaId == null || it.asignaturaId == asignaturaId) }
+
     // =====================================================================
-    // Datos de referencia y selección (no es lógica de negocio)
+    // Datos de referencia y selección
     // =====================================================================
 
-    val cursos: List<Curso> = MockData.cursos
-    val asignaturas: List<Asignatura> = MockData.asignaturas
-    private val estudiantes: List<Estudiante> = MockData.estudiantes
-    private val objetivos: List<ObjetivoAprendizaje> = MockData.objetivos
+    val cursos: StateFlow<List<Curso>> = repository.cursos.comoEstado()
+    val asignaturas: StateFlow<List<Asignatura>> = repository.asignaturas.comoEstado()
+    val estudiantes: StateFlow<List<Estudiante>> = repository.estudiantes.comoEstado()
+    val objetivos: StateFlow<List<ObjetivoAprendizaje>> = repository.objetivos.comoEstado()
+    private val cargas: StateFlow<List<CargaDocente>> = repository.cargas.comoEstado()
 
     private val _cursoSeleccionadoId = MutableStateFlow<String?>(null)
     val cursoSeleccionadoId: StateFlow<String?> = _cursoSeleccionadoId.asStateFlow()
@@ -89,165 +161,244 @@ class LibroMpazViewModel : ViewModel() {
     private val _asignaturaSeleccionadaId = MutableStateFlow<String?>(null)
     val asignaturaSeleccionadaId: StateFlow<String?> = _asignaturaSeleccionadaId.asStateFlow()
 
+    /** El curso y la asignatura elegidos se comparten entre pantallas a través del ViewModel (Guía 11). */
     fun seleccionarCurso(cursoId: String?, asignaturaId: String? = null) {
         _cursoSeleccionadoId.value = cursoId
         _asignaturaSeleccionadaId.value = asignaturaId
     }
 
-    fun cursoPorId(id: String?): Curso? = cursos.find { it.id == id }
-    fun asignaturaPorId(id: String?): Asignatura? = asignaturas.find { it.id == id }
-    fun estudiantePorId(id: String?): Estudiante? = estudiantes.find { it.id == id }
-    fun estudiantesDelCurso(cursoId: String?): List<Estudiante> = estudiantes.filter { it.cursoId == cursoId }
-    fun objetivosDe(asignaturaId: String?): List<ObjetivoAprendizaje> = objetivos.filter { it.asignaturaId == asignaturaId }
-
-    /**
-     * TODO(equipo): devolver SOLO las cargas del docente autenticado.
-     * RF: "mostrar únicamente los cursos/asignaturas bajo su asignación formal" (RBAC).
-     * Hoy devuelve todas las cargas, incluso las de otros docentes.
-     */
-    fun misCargas(usuario: Usuario?): List<CargaDocente> = MockData.cargas
+    fun cursoPorId(id: String?): Curso? = cursos.value.find { it.id == id }
+    fun asignaturaPorId(id: String?): Asignatura? = asignaturas.value.find { it.id == id }
+    fun estudiantePorId(id: String?): Estudiante? = estudiantes.value.find { it.id == id }
+    fun estudiantesDelCurso(cursoId: String?): List<Estudiante> = estudiantes.value.filter { it.cursoId == cursoId }
+    fun objetivosDe(asignaturaId: String?): List<ObjetivoAprendizaje> = objetivos.value.filter { it.asignaturaId == asignaturaId }
 
     // =====================================================================
-    // Módulo "Asistencia"
+    // Módulo "Asistencia" (RF-03, RF-04, RF-05)
     // =====================================================================
 
-    private val _asistencias = MutableStateFlow(MockData.asistencias)
+    private val asistencias = repository.asistencias.comoEstado()
+
+    /** Porcentaje de asistencia de cada curso (cursoId -> %), para Inspectoría. */
+    val porcentajesAsistencia: StateFlow<Map<String, Int>> = asistencias
+        .map { calcularPorcentajesPorCurso(it) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+
+    /** Estudiantes con inasistencias reiteradas y su número de ausencias (RF-11). */
+    val alertasInasistencia: StateFlow<List<Pair<Estudiante, Int>>> =
+        combine(asistencias, estudiantes) { registros, lista -> calcularInasistenciasReiteradas(registros, lista) }
+            .comoEstado()
+
+    /** Asistencia ya guardada del curso en esa fecha (idEstudiante -> estado), para corregirla. */
+    suspend fun asistenciaGuardada(cursoId: String, fecha: String): Map<String, EstadoAsistencia> =
+        repository.asistenciaDe(cursoId, fecha).associate { it.estudianteId to it.estado }
+
+    fun validarFechaAsistencia(fecha: String): String? = validarFecha(fecha, hoy())
 
     /**
-     * TODO(equipo): devolver la asistencia ya guardada del curso en esa fecha
-     * (idEstudiante -> estado), para mostrarla y poder corregirla. Hoy devuelve un mapa vacío.
-     * Pendiente con el CITT: si se puede corregir la asistencia de días anteriores.
+     * Guarda (o sobrescribe) la asistencia. Pueden hacerlo el docente del curso o Inspectoría
+     * (RF-05). La auditoría la registra el repositorio en la misma transacción.
      */
-    fun asistenciaGuardada(cursoId: String, fecha: String): Map<String, EstadoAsistencia> = emptyMap()
+    fun guardarAsistencia(
+        cursoId: String,
+        fecha: String,
+        estados: Map<String, EstadoAsistencia>,
+        alTerminar: () -> Unit
+    ) {
+        val usuario = _usuarioActivo.value ?: return
+        val autorizado = usuario.perfil == Perfil.INSPECTORIA || tieneCarga(cursoId)
+        if (!autorizado || validarFechaAsistencia(fecha) != null || estados.isEmpty()) return
 
-    /**
-     * TODO(equipo): guardar (o sobrescribir) la asistencia del curso en esa fecha, con
-     * registradoPor = usuario activo y la fecha y hora actuales, y dejar un RegistroAuditoria.
-     * RF: "registrar la asistencia diaria con estados presente, ausente, atrasado, justificado".
-     * Hoy no hace nada.
-     */
-    fun guardarAsistencia(cursoId: String, fecha: String, estados: Map<String, EstadoAsistencia>) {
-        // Sin implementar todavía.
+        val detalle = "Asistencia ${cursoPorId(cursoId)?.nombre ?: cursoId}, $fecha"
+        viewModelScope.launch {
+            repository.guardarAsistencia(usuario, cursoId, fecha, estados, detalle)
+            alTerminar()
+        }
     }
 
-    /**
-     * TODO(equipo): porcentaje de asistencia del curso (0 a 100) para Inspectoría y Dirección.
-     * Hoy devuelve null (sin calcular).
-     */
-    fun porcentajeAsistencia(cursoId: String): Int? = null
-
-    /**
-     * TODO(equipo): estudiantes con inasistencias reiteradas (por ejemplo, 3 o más ausencias),
-     * con su número de ausencias. RF de Inspectoría: "identificar inasistencias reiteradas".
-     * Hoy devuelve una lista vacía.
-     */
-    fun inasistenciasReiteradas(): List<Pair<Estudiante, Int>> = emptyList()
-
     // =====================================================================
-    // Módulo "Cobertura curricular"
+    // Módulo "Cobertura curricular" (RF-06, RF-07)
     // =====================================================================
 
-    private val _sesiones = MutableStateFlow(MockData.sesiones)
-    val sesiones: StateFlow<List<SesionClase>> = _sesiones.asStateFlow()
+    val sesiones: StateFlow<List<SesionClase>> = repository.sesiones.comoEstado()
 
     fun sesionesDe(cursoId: String?, asignaturaId: String?): List<SesionClase> =
-        _sesiones.value.filter { it.cursoId == cursoId && it.asignaturaId == asignaturaId }
+        sesiones.value.filter { it.cursoId == cursoId && it.asignaturaId == asignaturaId }
 
-    /**
-     * TODO(equipo): guardar la sesión con los OA y el contenido trabajados, con auditoría.
-     * RF: "asociar OA y contenidos didácticos a cada sesión/bloque lectivo". Hoy no hace nada.
-     */
-    fun guardarSesion(cursoId: String, asignaturaId: String, fecha: String, bloque: String, oaIds: List<String>, contenido: String) {
-        // Sin implementar todavía.
+    /** Valida y guarda la sesión. Devuelve los errores para mostrarlos junto a cada campo. */
+    fun guardarSesion(
+        cursoId: String,
+        asignaturaId: String,
+        fecha: String,
+        bloque: String,
+        oaIds: List<String>,
+        contenido: String,
+        alTerminar: () -> Unit
+    ): ErroresSesion {
+        val errores = validarSesion(fecha, bloque, oaIds, contenido, hoy())
+        val usuario = _usuarioActivo.value
+        if (errores.hayErrores || usuario == null || !tieneCarga(cursoId, asignaturaId)) return errores
+
+        val detalle = "Sesión de clase ${cursoPorId(cursoId)?.nombre}, ${asignaturaPorId(asignaturaId)?.nombre}, $fecha ${bloque.trim()}"
+        viewModelScope.launch {
+            repository.guardarSesion(usuario, cursoId, asignaturaId, fecha, bloque.trim(), oaIds, contenido.trim(), detalle)
+            alTerminar()
+        }
+        return errores
     }
 
-    /**
-     * TODO(equipo): ids de los OA ya trabajados en el curso y asignatura (según las sesiones
-     * registradas). RF de UTP: "vistas analíticas de cobertura curricular por curso".
-     * Hoy devuelve un conjunto vacío.
-     */
-    fun oasTrabajados(cursoId: String?, asignaturaId: String?): Set<String> = emptySet()
+    /** Ids de los OA ya trabajados en el curso y asignatura (vista de UTP). */
+    fun oasTrabajados(cursoId: String?, asignaturaId: String?): Set<String> =
+        calcularOasTrabajados(sesiones.value, cursoId, asignaturaId)
 
     // =====================================================================
-    // Módulo "Calificaciones"
+    // Módulo "Calificaciones" (RF-08, RF-09)
     // =====================================================================
 
-    private val _evaluaciones = MutableStateFlow(MockData.evaluaciones)
-    val evaluaciones: StateFlow<List<Evaluacion>> = _evaluaciones.asStateFlow()
-
-    private val _calificaciones = MutableStateFlow(MockData.calificaciones)
+    val evaluaciones: StateFlow<List<Evaluacion>> = repository.evaluaciones.comoEstado()
+    val calificaciones: StateFlow<List<Calificacion>> = repository.calificaciones.comoEstado()
 
     fun evaluacionesDe(cursoId: String?, asignaturaId: String?): List<Evaluacion> =
-        _evaluaciones.value.filter { it.cursoId == cursoId && it.asignaturaId == asignaturaId }
+        evaluaciones.value.filter { it.cursoId == cursoId && it.asignaturaId == asignaturaId }
 
     fun calificacionesDe(evaluacionId: String?): List<Calificacion> =
-        _calificaciones.value.filter { it.evaluacionId == evaluacionId }
+        calificaciones.value.filter { it.evaluacionId == evaluacionId }
 
-    /**
-     * TODO(equipo): crear la evaluación (instrumento + fecha) para el curso y la asignatura, con
-     * auditoría. Validar nombre y fecha obligatorios. Hoy no hace nada.
-     */
-    fun crearEvaluacion(cursoId: String, asignaturaId: String, nombreInstrumento: String, fecha: String) {
-        // Sin implementar todavía.
+    fun crearEvaluacion(
+        cursoId: String,
+        asignaturaId: String,
+        nombreInstrumento: String,
+        fecha: String,
+        alTerminar: () -> Unit
+    ): ErroresEvaluacion {
+        val errores = validarEvaluacion(nombreInstrumento, fecha, hoy())
+        val usuario = _usuarioActivo.value
+        if (errores.hayErrores || usuario == null || !tieneCarga(cursoId, asignaturaId)) return errores
+
+        val nombre = nombreInstrumento.trim()
+        val detalle = "Evaluación \"$nombre\" ${cursoPorId(cursoId)?.nombre}, ${asignaturaPorId(asignaturaId)?.nombre}"
+        viewModelScope.launch {
+            repository.crearEvaluacion(usuario, cursoId, asignaturaId, nombre, fecha, detalle)
+            alTerminar()
+        }
+        return errores
     }
 
-    /**
-     * TODO(equipo): validar una nota escrita por el docente y devolver el mensaje de error o
-     * null si es válida (número con coma o punto; rango 1,0 a 7,0 si el CITT lo confirma).
-     * Hoy siempre devuelve null (sin validar).
-     */
-    fun validarNota(texto: String): String? = null
+    /** Error de una nota escrita (o null si es válida). La regla está en Validaciones.kt. */
+    fun errorDeNota(texto: String): String? = validarNota(texto)
 
     /**
-     * TODO(equipo): guardar las notas de la evaluación (idEstudiante -> nota escrita), con
-     * auditoría. RF: "registrar calificaciones asociadas a un instrumento y fecha". Hoy no hace nada.
+     * Guarda las notas escritas (idEstudiante -> texto). Devuelve los errores por estudiante: si
+     * hay alguno, no se guarda nada. Una nota que existía y se dejó en blanco se elimina.
      */
-    fun guardarCalificaciones(evaluacionId: String, notas: Map<String, String>) {
-        // Sin implementar todavía.
+    fun guardarCalificaciones(
+        evaluacion: Evaluacion,
+        notas: Map<String, String>,
+        alTerminar: () -> Unit
+    ): Map<String, String> {
+        val errores = notas.mapNotNull { (estudianteId, texto) -> validarNota(texto)?.let { estudianteId to it } }.toMap()
+        val usuario = _usuarioActivo.value
+        if (errores.isNotEmpty() || usuario == null || !tieneCarga(evaluacion.cursoId, evaluacion.asignaturaId)) return errores
+
+        val validas = notas.mapNotNull { (estudianteId, texto) -> parsearNota(texto)?.let { estudianteId to it } }.toMap()
+        val sinNota = calificacionesDe(evaluacion.id).map { it.estudianteId }.filter { it !in validas }
+        if (validas.isEmpty() && sinNota.isEmpty()) return errores
+
+        val detalle = "Notas de \"${evaluacion.nombreInstrumento}\" ${cursoPorId(evaluacion.cursoId)?.nombre} (${validas.size} notas)"
+        viewModelScope.launch {
+            repository.guardarCalificaciones(usuario, evaluacion.id, validas, sinNota, detalle)
+            alTerminar()
+        }
+        return errores
     }
 
-    /**
-     * TODO(equipo): detectar desfases u omisiones de registro de notas, por ejemplo
-     * evaluaciones con estudiantes sin nota, o cursos/asignaturas sin evaluaciones.
-     * RF de UTP: "identificar desfases u omisiones de registro". Hoy devuelve una lista vacía.
-     */
-    fun desfasesCalificaciones(): List<String> = emptyList()
+    /** Elimina la evaluación y sus notas (la pantalla pide confirmación antes, RNF-02). */
+    fun eliminarEvaluacion(evaluacion: Evaluacion, alTerminar: () -> Unit) {
+        val usuario = _usuarioActivo.value ?: return
+        if (!tieneCarga(evaluacion.cursoId, evaluacion.asignaturaId)) return
+        val detalle = "Evaluación \"${evaluacion.nombreInstrumento}\" ${cursoPorId(evaluacion.cursoId)?.nombre} y sus notas"
+        viewModelScope.launch {
+            repository.eliminarEvaluacion(usuario, evaluacion, detalle)
+            alTerminar()
+        }
+    }
+
+    /** Desfases u omisiones en el registro de notas, para UTP. */
+    val desfases: StateFlow<List<String>> = combine(
+        cargas,
+        evaluaciones,
+        calificaciones,
+        estudiantes,
+        combine(cursos, asignaturas) { c, a -> c to a }
+    ) { listaCargas, listaEvaluaciones, listaNotas, listaEstudiantes, (listaCursos, listaAsignaturas) ->
+        calcularDesfases(listaCargas, listaEvaluaciones, listaNotas, listaEstudiantes, listaCursos, listaAsignaturas)
+    }.comoEstado()
 
     // =====================================================================
-    // Módulo "Hoja de vida"
+    // Módulo "Hoja de vida" (RF-10, RF-11)
     // =====================================================================
 
-    private val _anotaciones = MutableStateFlow(MockData.anotaciones)
-    val anotaciones: StateFlow<List<Anotacion>> = _anotaciones.asStateFlow()
+    val anotaciones: StateFlow<List<Anotacion>> = repository.anotaciones.comoEstado()
 
     fun anotacionesDe(estudianteId: String?): List<Anotacion> =
-        _anotaciones.value.filter { it.estudianteId == estudianteId }
+        anotaciones.value.filter { it.estudianteId == estudianteId }
 
-    /**
-     * TODO(equipo): registrar la anotación con marca temporal y "firma digital" del docente
-     * (usuario activo + fecha y hora), y dejar auditoría. Hoy no hace nada.
-     */
-    fun registrarAnotacion(estudianteId: String, tipo: TipoAnotacion, descripcion: String) {
-        // Sin implementar todavía.
+    /** Hoja de vida del colegio filtrada por tipo (null = todas), para Inspectoría. */
+    fun anotacionesPorTipo(tipo: TipoAnotacion?): List<Anotacion> =
+        anotaciones.value.filter { tipo == null || it.tipo == tipo }
+
+    fun validarNuevaAnotacion(estudiante: Estudiante?, tipo: TipoAnotacion?, descripcion: String): ErroresAnotacion =
+        validarAnotacion(estudiante != null, tipo != null, descripcion)
+
+    /** Registra la anotación con marca temporal y firma (usuario activo + fecha y hora). */
+    fun registrarAnotacion(estudiante: Estudiante, tipo: TipoAnotacion, descripcion: String, alTerminar: () -> Unit) {
+        val usuario = _usuarioActivo.value ?: return
+        if (validarNuevaAnotacion(estudiante, tipo, descripcion).hayErrores || !tieneCarga(estudiante.cursoId)) return
+        val detalle = "${tipo.etiqueta} a ${estudiante.nombreFicticio}"
+        viewModelScope.launch {
+            repository.registrarAnotacion(usuario, estudiante.id, tipo, descripcion.trim(), detalle)
+            alTerminar()
+        }
     }
 
-    /**
-     * TODO(equipo): anotaciones que requieren intervención de Inspectoría (por ejemplo,
-     * negativas reiteradas de un mismo estudiante). Hoy devuelve una lista vacía.
-     */
-    fun anotacionesQueRequierenIntervencion(): List<Anotacion> = emptyList()
+    /** Anotaciones negativas de estudiantes que requieren intervención de Inspectoría. */
+    val alertasAnotaciones: StateFlow<List<Anotacion>> = anotaciones
+        .map { calcularAnotacionesIntervencion(it) }
+        .comoEstado()
 
     // =====================================================================
-    // Módulo "Panel administrativo" (Dirección) y auditoría
+    // Módulo "Panel administrativo" (Dirección, RF-12) y auditoría (RN-02)
     // =====================================================================
 
-    private val _auditoria = MutableStateFlow(MockData.auditoria)
-    val auditoria: StateFlow<List<RegistroAuditoria>> = _auditoria.asStateFlow()
+    val auditoria: StateFlow<List<RegistroAuditoria>> = repository.auditoria.comoEstado()
+
+    /** Métricas consolidadas por curso. Se recalculan solas cuando cambia cualquier tabla. */
+    val resumenCursos: StateFlow<List<ResumenCurso>> = combine(
+        cursos,
+        asistencias,
+        sesiones,
+        combine(evaluaciones, calificaciones) { e, c -> e to c },
+        combine(anotaciones, estudiantes) { a, e -> a to e }
+    ) { listaCursos, listaAsistencias, listaSesiones, (listaEvaluaciones, listaNotas), (listaAnotaciones, listaEstudiantes) ->
+        calcularResumenPorCurso(listaCursos, listaAsistencias, listaSesiones, listaEvaluaciones, listaNotas, listaAnotaciones, listaEstudiantes)
+    }.comoEstado()
 
     /**
-     * TODO(equipo): calcular las métricas consolidadas de cada curso (asistencia, sesiones,
-     * notas registradas, anotaciones negativas). RF de Dirección: "estado global administrativo
-     * del colegio". Hoy devuelve los cursos sin métricas (valores null).
+     * RECURSO NATIVO: escribe el reporte CSV en el archivo que Dirección eligió con el selector
+     * del sistema (ver recursosnativos/ExportadorCsv.kt). Solo métricas por curso, sin nombres de
+     * estudiantes. La exportación queda en la auditoría.
      */
-    fun resumenPorCurso(): List<ResumenCurso> = cursos.map { ResumenCurso(cursoId = it.id) }
+    fun exportarReporte(uri: Uri, alTerminar: (Boolean) -> Unit) {
+        val usuario = _usuarioActivo.value
+        if (usuario?.perfil != Perfil.DIRECCION) {
+            alTerminar(false)
+            return
+        }
+        val contenido = generarReporteCsv(resumenCursos.value, cursos.value, usuario.nombre, ahora())
+        viewModelScope.launch {
+            val ok = ExportadorCsv.escribir(getApplication(), uri, contenido)
+            if (ok) repository.registrarExportacion(usuario, "Reporte CSV de métricas por curso")
+            alTerminar(ok)
+        }
+    }
 }
