@@ -1,5 +1,10 @@
 package com.librompaz.app.model
 
+import androidx.room.Entity
+import androidx.room.ForeignKey
+import androidx.room.Index
+import androidx.room.PrimaryKey
+
 enum class TipoAnotacion(val etiqueta: String) {
     POSITIVA("Anotación positiva"),
     NEGATIVA("Anotación negativa"),
@@ -8,11 +13,19 @@ enum class TipoAnotacion(val etiqueta: String) {
 
 /**
  * Anotación de la hoja de vida escolar (entidad del caso), con marca temporal y "firma digital"
- * del docente responsable. Pendiente con el CITT: qué mecanismo exacto se espera para la firma
- * (registro automático de usuario + fecha + hora, o algo adicional como reingresar la clave).
+ * del docente responsable. Tabla "anotaciones".
+ *
+ * Supuesto (a confirmar con el CITT): la firma digital es el registro automático del usuario
+ * autenticado + fecha y hora, después de una confirmación explícita del docente. Una vez
+ * registrada, la anotación no se puede editar ni borrar desde la app.
  */
+@Entity(
+    tableName = "anotaciones",
+    foreignKeys = [ForeignKey(entity = Estudiante::class, parentColumns = ["id"], childColumns = ["estudianteId"])],
+    indices = [Index("estudianteId")]
+)
 data class Anotacion(
-    val id: String,
+    @PrimaryKey val id: String,
     val estudianteId: String,
     val tipo: TipoAnotacion,
     val descripcion: String,

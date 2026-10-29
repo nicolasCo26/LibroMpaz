@@ -1,8 +1,15 @@
 package com.librompaz.app.model
 
-/** Usuario del sistema. Solo datos ficticios (ver MockData.usuarios). */
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+
+/**
+ * Usuario del sistema (solo datos ficticios). Tabla "usuarios".
+ * Solo existen los cuatro perfiles internos: no hay usuarios estudiantes ni apoderados (RN-01).
+ */
+@Entity(tableName = "usuarios")
 data class Usuario(
-    val id: String,
+    @PrimaryKey val id: String,
     val nombre: String,
     val usuario: String,
     val clave: String,
