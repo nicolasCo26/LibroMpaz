@@ -42,7 +42,7 @@ fun AuditoriaScreen(navController: NavHostController, viewModel: LibroMpazViewMo
                 Card(modifier = Modifier.fillMaxWidth().animateItem()) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text("${registro.accion} · ${registro.detalle}", style = MaterialTheme.typography.titleSmall)
-                        Text("${registro.usuario} (${registro.perfil.etiqueta})", style = MaterialTheme.typography.bodySmall)
+                        Text("${registro.usuario} · ${registro.perfil.etiqueta}", style = MaterialTheme.typography.bodySmall)
                         Text(registro.fechaHora, style = MaterialTheme.typography.labelSmall)
                     }
                 }
