@@ -29,16 +29,16 @@ import com.librompaz.app.model.Usuario
  */
 object MockData {
 
-    private const val DOCENTE_MAT = "Docente Matemática (demo)"
-    private const val DOCENTE_LEN = "Docente Lenguaje (demo)"
+    private const val DOCENTE_MAT = "Docente de Matemática"
+    private const val DOCENTE_LEN = "Docente de Lenguaje"
 
     /** Usuarios de prueba para el login (ver README). */
     val usuarios = listOf(
         Usuario("U1", DOCENTE_MAT, "docente.mat@libromp.cl", "docente123", Perfil.DOCENTE),
         Usuario("U2", DOCENTE_LEN, "docente.len@libromp.cl", "docente123", Perfil.DOCENTE),
-        Usuario("U3", "UTP (demo)", "utp@libromp.cl", "utp123", Perfil.UTP),
-        Usuario("U4", "Inspectoría (demo)", "inspectoria@libromp.cl", "inspectoria123", Perfil.INSPECTORIA),
-        Usuario("U5", "Dirección (demo)", "direccion@libromp.cl", "direccion123", Perfil.DIRECCION),
+        Usuario("U3", "Coordinación UTP", "utp@libromp.cl", "utp123", Perfil.UTP),
+        Usuario("U4", "Inspectoría General", "inspectoria@libromp.cl", "inspectoria123", Perfil.INSPECTORIA),
+        Usuario("U5", "Dirección", "direccion@libromp.cl", "direccion123", Perfil.DIRECCION),
     )
 
     val cursos = listOf(Curso("C3A", "3° Básico A"), Curso("C4A", "4° Básico A"))
@@ -61,15 +61,15 @@ object MockData {
     )
 
     val objetivos = listOf(
-        ObjetivoAprendizaje("OA-MAT-1", "MAT", "OA 1 (ejemplo)", "Contar números del 0 al 1.000."),
-        ObjetivoAprendizaje("OA-MAT-2", "MAT", "OA 2 (ejemplo)", "Leer y representar números hasta el 1.000."),
-        ObjetivoAprendizaje("OA-MAT-3", "MAT", "OA 3 (ejemplo)", "Resolver adiciones y sustracciones."),
-        ObjetivoAprendizaje("OA-MAT-4", "MAT", "OA 4 (ejemplo)", "Reconocer figuras 2D y 3D."),
-        ObjetivoAprendizaje("OA-LEN-1", "LEN", "OA 1 (ejemplo)", "Leer textos con fluidez."),
-        ObjetivoAprendizaje("OA-LEN-2", "LEN", "OA 2 (ejemplo)", "Comprender textos narrativos."),
-        ObjetivoAprendizaje("OA-LEN-3", "LEN", "OA 3 (ejemplo)", "Escribir textos breves con un propósito."),
-        ObjetivoAprendizaje("OA-CN-1", "CN", "OA 1 (ejemplo)", "Describir necesidades de los seres vivos."),
-        ObjetivoAprendizaje("OA-CN-2", "CN", "OA 2 (ejemplo)", "Observar y clasificar materiales."),
+        ObjetivoAprendizaje("OA-MAT-1", "MAT", "OA 1", "Contar números del 0 al 1.000."),
+        ObjetivoAprendizaje("OA-MAT-2", "MAT", "OA 2", "Leer y representar números hasta el 1.000."),
+        ObjetivoAprendizaje("OA-MAT-3", "MAT", "OA 3", "Resolver adiciones y sustracciones."),
+        ObjetivoAprendizaje("OA-MAT-4", "MAT", "OA 4", "Reconocer figuras 2D y 3D."),
+        ObjetivoAprendizaje("OA-LEN-1", "LEN", "OA 1", "Leer textos con fluidez."),
+        ObjetivoAprendizaje("OA-LEN-2", "LEN", "OA 2", "Comprender textos narrativos."),
+        ObjetivoAprendizaje("OA-LEN-3", "LEN", "OA 3", "Escribir textos breves con un propósito."),
+        ObjetivoAprendizaje("OA-CN-1", "CN", "OA 1", "Describir necesidades de los seres vivos."),
+        ObjetivoAprendizaje("OA-CN-2", "CN", "OA 2", "Observar y clasificar materiales."),
     )
 
     // ---- Asistencia de ejemplo: 5 días; todos presentes salvo los casos de esta tabla ----
@@ -107,8 +107,8 @@ object MockData {
     )
 
     val evaluaciones = listOf(
-        Evaluacion("EV1", "C3A", "MAT", "Prueba unidad 1 (ejemplo)", "2026-09-25"),
-        Evaluacion("EV2", "C4A", "LEN", "Control de lectura (ejemplo)", "2026-09-30"),
+        Evaluacion("EV1", "C3A", "MAT", "Prueba unidad 1", "2026-09-25"),
+        Evaluacion("EV2", "C4A", "LEN", "Control de lectura", "2026-09-30"),
     )
 
     // EV1 queda incompleta a propósito (solo 2 notas de 8) para que UTP vea una omisión.
@@ -121,9 +121,9 @@ object MockData {
 
     val anotaciones = listOf(
         Anotacion("AN1", "E3A-1", TipoAnotacion.POSITIVA, "Ayuda a sus compañeros durante la actividad.", "2026-09-30 10:15", DOCENTE_MAT),
-        Anotacion("AN2", "E3A-2", TipoAnotacion.NEGATIVA, "Interrumpe la clase en reiteradas ocasiones (ejemplo).", "2026-10-01 11:40", DOCENTE_MAT),
-        Anotacion("AN3", "E3A-2", TipoAnotacion.NEGATIVA, "No respeta los turnos de habla (ejemplo).", "2026-10-05 10:20", DOCENTE_MAT),
-        Anotacion("AN4", "E4A-3", TipoAnotacion.OBSERVACION, "Se observa desmotivado durante la lectura (ejemplo).", "2026-10-02 09:55", DOCENTE_LEN),
+        Anotacion("AN2", "E3A-2", TipoAnotacion.NEGATIVA, "Interrumpe la clase en reiteradas ocasiones.", "2026-10-01 11:40", DOCENTE_MAT),
+        Anotacion("AN3", "E3A-2", TipoAnotacion.NEGATIVA, "No respeta los turnos de habla.", "2026-10-05 10:20", DOCENTE_MAT),
+        Anotacion("AN4", "E4A-3", TipoAnotacion.OBSERVACION, "Se observa desmotivado durante la lectura.", "2026-10-02 09:55", DOCENTE_LEN),
     )
 
     val auditoria = listOf(
