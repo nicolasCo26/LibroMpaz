@@ -1,6 +1,13 @@
 package com.librompaz.app.navigation
 
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -60,20 +67,53 @@ object Rutas {
  *
  * Botón atrás: el atrás nativo de Android funciona solo (lo maneja el NavHost). Al ingresar,
  * LOGIN sale de la pila; "Cerrar sesión" limpia la pila completa.
+ *
+ * RBAC (RF-02): cada ruta indica qué perfiles pueden verla (función protegida). Si no hay sesión
+ * o el perfil no corresponde, se vuelve al login.
  */
 @Composable
 fun AppNavigation(
     navController: NavHostController = rememberNavController(),
     viewModel: LibroMpazViewModel = viewModel()
 ) {
-    val cerrarSesion: () -> Unit = {
-        viewModel.logout()
+    val usuario by viewModel.usuarioActivo.collectAsState()
+
+    val irAlLogin: () -> Unit = {
         navController.navigate(Rutas.LOGIN) {
             popUpTo(navController.graph.id) { inclusive = true }
         }
     }
+    val cerrarSesion: () -> Unit = {
+        viewModel.logout()
+        irAlLogin()
+    }
 
-    NavHost(navController = navController, startDestination = Rutas.LOGIN) {
+    /** Muestra la pantalla solo si el usuario activo tiene uno de los perfiles permitidos. */
+    @Composable
+    fun protegida(vararg permitidos: Perfil, contenido: @Composable () -> Unit) {
+        if (usuario?.perfil in permitidos) {
+            contenido()
+        } else {
+            // Al cerrar sesión ya se navegó al login: solo se redirige si todavía no estamos ahí.
+            LaunchedEffect(Unit) {
+                if (navController.currentDestination?.route != Rutas.LOGIN) irAlLogin()
+            }
+        }
+    }
+
+    NavHost(
+        navController = navController,
+        startDestination = Rutas.LOGIN,
+        // Transiciones (Guía 12): la pantalla nueva entra deslizándose y la anterior se desvanece.
+        enterTransition = {
+            slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(300)) + fadeIn(tween(300))
+        },
+        exitTransition = { fadeOut(tween(200)) },
+        popEnterTransition = { fadeIn(tween(300)) },
+        popExitTransition = {
+            slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(300)) + fadeOut(tween(300))
+        }
+    ) {
         composable(Rutas.LOGIN) {
             LoginScreen(
                 viewModel = viewModel,
@@ -92,24 +132,24 @@ fun AppNavigation(
         }
 
         // ---- Docente ----
-        composable(Rutas.DOC_CURSOS) { MisCursosScreen(navController, viewModel, onCerrarSesion = cerrarSesion) }
-        composable(Rutas.DOC_CURSO) { CursoDocenteScreen(navController, viewModel) }
-        composable(Rutas.DOC_CLASE) { RegistroClaseScreen(navController, viewModel) }
-        composable(Rutas.DOC_CALIFICACIONES) { CalificacionesScreen(navController, viewModel) }
-        composable(Rutas.DOC_HOJA_VIDA) { HojaDeVidaScreen(navController, viewModel) }
-        composable(Rutas.ASISTENCIA) { AsistenciaScreen(navController, viewModel) }
+        composable(Rutas.DOC_CURSOS) { protegida(Perfil.DOCENTE) { MisCursosScreen(navController, viewModel, onCerrarSesion = cerrarSesion) } }
+        composable(Rutas.DOC_CURSO) { protegida(Perfil.DOCENTE) { CursoDocenteScreen(navController, viewModel) } }
+        composable(Rutas.DOC_CLASE) { protegida(Perfil.DOCENTE) { RegistroClaseScreen(navController, viewModel) } }
+        composable(Rutas.DOC_CALIFICACIONES) { protegida(Perfil.DOCENTE) { CalificacionesScreen(navController, viewModel) } }
+        composable(Rutas.DOC_HOJA_VIDA) { protegida(Perfil.DOCENTE) { HojaDeVidaScreen(navController, viewModel) } }
+        composable(Rutas.ASISTENCIA) { protegida(Perfil.DOCENTE, Perfil.INSPECTORIA) { AsistenciaScreen(navController, viewModel) } }
 
         // ---- UTP ----
-        composable(Rutas.UTP_PANEL) { PanelUtpScreen(navController, viewModel, onCerrarSesion = cerrarSesion) }
-        composable(Rutas.UTP_COBERTURA) { CoberturaCurricularScreen(navController, viewModel) }
-        composable(Rutas.UTP_CALIFICACIONES) { RevisionCalificacionesScreen(navController, viewModel) }
+        composable(Rutas.UTP_PANEL) { protegida(Perfil.UTP) { PanelUtpScreen(navController, viewModel, onCerrarSesion = cerrarSesion) } }
+        composable(Rutas.UTP_COBERTURA) { protegida(Perfil.UTP) { CoberturaCurricularScreen(navController, viewModel) } }
+        composable(Rutas.UTP_CALIFICACIONES) { protegida(Perfil.UTP) { RevisionCalificacionesScreen(navController, viewModel) } }
 
         // ---- Inspectoría ----
-        composable(Rutas.INSP_PANEL) { PanelInspectoriaScreen(navController, viewModel, onCerrarSesion = cerrarSesion) }
-        composable(Rutas.INSP_ALERTAS) { AlertasInspectoriaScreen(navController, viewModel) }
+        composable(Rutas.INSP_PANEL) { protegida(Perfil.INSPECTORIA) { PanelInspectoriaScreen(navController, viewModel, onCerrarSesion = cerrarSesion) } }
+        composable(Rutas.INSP_ALERTAS) { protegida(Perfil.INSPECTORIA) { AlertasInspectoriaScreen(navController, viewModel) } }
 
         // ---- Dirección ----
-        composable(Rutas.DIR_PANEL) { PanelDireccionScreen(navController, viewModel, onCerrarSesion = cerrarSesion) }
-        composable(Rutas.DIR_AUDITORIA) { AuditoriaScreen(navController, viewModel) }
+        composable(Rutas.DIR_PANEL) { protegida(Perfil.DIRECCION) { PanelDireccionScreen(navController, viewModel, onCerrarSesion = cerrarSesion) } }
+        composable(Rutas.DIR_AUDITORIA) { protegida(Perfil.DIRECCION) { AuditoriaScreen(navController, viewModel) } }
     }
 }
