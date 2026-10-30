@@ -49,7 +49,7 @@ import com.librompaz.app.viewmodel.LibroMpazViewModel
  *
  * Al cambiar la fecha se carga lo ya registrado ese día (se puede corregir). Pide confirmación
  * antes de guardar si va a sobrescribir un registro (RNF-02).
- * Supuesto (a confirmar con el CITT): se permite corregir días anteriores, y queda auditado.
+ * Supuesto: se permite corregir días anteriores, y queda auditado.
  */
 @Composable
 fun AsistenciaScreen(navController: NavHostController, viewModel: LibroMpazViewModel) {

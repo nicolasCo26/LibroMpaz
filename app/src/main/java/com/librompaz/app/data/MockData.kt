@@ -24,7 +24,7 @@ import com.librompaz.app.model.Usuario
  * en Room la primera vez que se abre la app (base vacía). Desde ahí, todo se lee y se guarda
  * en SQLite.
  *
- * Supuesto (a confirmar con el CITT): para el MVP basta una muestra reducida (2 cursos) en vez
+ * Supuesto: basta una muestra reducida (2 cursos) en vez
  * de los ~270 estudiantes del colegio.
  */
 object MockData {

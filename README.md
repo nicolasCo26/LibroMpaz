@@ -1,26 +1,26 @@
-# Libro MPAZ — Libro digital de clases (DSY1105-005, Maipú)
+# Libro MPAZ — Libro digital de clases
 
-Aplicación Android para el caso de Vinculación con el Medio **"Libro Digital de Clases Interactivo 'Libro MPAZ' - Mpazbook"** de la Escuela Escritora Marcela Paz (San Bernardo). Reemplaza el libro de clases en papel (asistencia, cobertura curricular, calificaciones y hoja de vida) por una app con vistas por perfil: **Docente, UTP, Inspectoría y Dirección**.
+Aplicación Android para la Escuela Escritora Marcela Paz (San Bernardo). Reemplaza el libro de clases en papel (asistencia, cobertura curricular, calificaciones y hoja de vida) por una app con vistas por perfil: **Docente, UTP, Inspectoría y Dirección**.
 
-Evaluación Parcial 2 · Kotlin · Jetpack Compose · Material 3 · MVVM · Room (SQLite).
+Kotlin · Jetpack Compose · Material 3 · MVVM · Room (SQLite).
 
-## Integrantes
+## Equipo
 
 | Nombre | Usuario GitHub | Qué desarrolló |
 |---|---|---|
 | Nicolás Navarrete Reyes | [nicolasCo26](https://github.com/nicolasCo26) | Persistencia con Room, ViewModel y reglas, asistencia, calificaciones, recurso nativo y panel de Dirección |
 | Camila Leiva | [alemi-vy](https://github.com/alemi-vy) | Login y navegación por rol, pantallas del docente (clase y hoja de vida), paneles de UTP e Inspectoría, README |
 
-**Repositorio (privado):** https://github.com/nicolasCo26/LibroMpaz. El docente está agregado como colaborador. Cada funcionalidad se desarrolló en su propia rama (`feat/...`) y se integró a `main` con un Pull Request.
+**Repositorio:** https://github.com/nicolasCo26/LibroMpaz. Cada funcionalidad se desarrolló en su propia rama (`feat/...`) y se integró a `main` con un Pull Request.
 
 ## Cómo ejecutar
 
-1. Descomprimir el ZIP en una carpeta limpia.
+1. Clonar el repositorio o descomprimir el proyecto en una carpeta limpia.
 2. Android Studio → **File > Open…** → seleccionar la carpeta que contiene `settings.gradle.kts`.
 3. Esperar el Gradle Sync (la primera vez necesita internet).
 4. Ejecutar ▶ **Run 'app'** en un emulador o dispositivo (API 24 o superior).
 
-Si Android Studio sugiere actualizar Gradle o el Android Gradle Plugin, **no aceptar**. Versiones: Kotlin 2.0.0 · AGP 8.5.2 · Gradle 8.7 · Room 2.6.1 · KSP 2.0.0-1.0.24.
+Si Android Studio sugiere actualizar Gradle o el Android Gradle Plugin, **no aceptar**. El proyecto compila con JDK 17 o 21 (*Settings > Build Tools > Gradle > Gradle JDK*), no con JDK 25. Versiones: Kotlin 2.0.0 · AGP 8.5.2 · Gradle 8.7 · Room 2.6.1 · KSP 2.0.0-1.0.24.
 
 La primera vez que se abre, la app crea la base de datos `libro_mpaz.db` y la llena con datos ficticios (`data/MockData.kt`). Para volver a los datos iniciales: **Ajustes del teléfono > Apps > Libro MPAZ > Almacenamiento > Borrar datos**.
 
@@ -57,7 +57,7 @@ La primera vez que se abre, la app crea la base de datos `libro_mpaz.db` y la ll
 | RNF-01 Interfaz simple y rápida | Pantallas de una sola tarea; Room local, sin red | — |
 | RNF-02 Confirmación antes de sobrescribir o borrar | Diálogos al sobrescribir asistencia o notas, eliminar evaluación y registrar anotación | Pantallas del docente |
 | RNF-03 Sin GPS, cámara, micrófono ni biometría | No se declara ningún permiso en el `AndroidManifest` | — |
-| RNF-04 Datos 100 % ficticios | "Estudiante 3A-01", correos `@libromp.cl` de demostración | `MockData.kt` |
+| RNF-04 Datos 100 % ficticios | "Estudiante 3A-01", correos `@libromp.cl` | `MockData.kt` |
 
 ## Recurso nativo: almacenamiento con el selector de archivos del sistema
 
@@ -68,9 +68,9 @@ La primera vez que se abre, la app crea la base de datos `libro_mpaz.db` y la ll
 - solo lo puede generar el perfil **Dirección**;
 - queda registrado en la **auditoría** (acción `EXPORTAR`).
 
-**Cómo respeta las restricciones del caso:** no usa GPS, cámara, micrófono ni biometría (RNF-03), y la app no envía nada por su cuenta: no hay notificaciones, correos ni mensajes. El archivo se guarda donde el usuario decide.
+**Cómo respeta las restricciones del proyecto:** no usa GPS, cámara, micrófono ni biometría (RNF-03), y la app no envía nada por su cuenta: no hay notificaciones, correos ni mensajes. El archivo se guarda donde el usuario decide.
 
-**Integración y permisos:** se usa `rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv"))`, el mismo patrón de la Guía 13. Android devuelve un `Uri` y `ExportadorCsv` escribe en él con el `ContentResolver`, en `Dispatchers.IO`. **No requiere declarar permisos**: con Storage Access Framework el usuario elige el archivo y la app solo recibe acceso a ese archivo. Si el usuario cancela, se muestra "Exportación cancelada" y la app no falla.
+**Integración y permisos:** se usa `rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv"))`. Android devuelve un `Uri` y `ExportadorCsv` escribe en él con el `ContentResolver`, en `Dispatchers.IO`. **No requiere declarar permisos**: con Storage Access Framework el usuario elige el archivo y la app solo recibe acceso a ese archivo. Si el usuario cancela, se muestra "Exportación cancelada" y la app no falla.
 
 Archivos: `recursosnativos/ExportadorCsv.kt`, `ui/screen/direccion/PanelDireccionScreen.kt` y `LibroMpazViewModel.exportarReporte()`.
 
@@ -102,9 +102,7 @@ Pantalla (@Composable) ──evento──> ViewModel ──> Repository ──> 
 - **Animaciones:** transiciones entre pantallas (deslizar y desvanecer), color animado de los estados de asistencia (`animateColorAsState`), barras de avance animadas (`animateFloatAsState`), planilla de notas que aparece al elegir una evaluación (`AnimatedVisibility`), `animateContentSize` y `animateItem` en listas, y un indicador de carga mientras se prepara la base.
 - **Componentes interactivos:** `DatePickerDialog`, listas desplegables (`ExposedDropdownMenuBox`), `FilterChip`, `Checkbox` y diálogos.
 
-## Supuestos (pendientes de confirmar con el CITT)
-
-Están marcados también en el código con el comentario "Supuesto".
+## Decisiones de diseño
 
 1. Un docente puede tener más de una asignatura (en los datos, el docente de Lenguaje también hace Ciencias).
 2. Los cuatro perfiles son excluyentes: cada usuario tiene un solo rol.
@@ -114,10 +112,8 @@ Están marcados también en el código con el comentario "Supuesto".
 6. Las notas se validan en el rango **1,0 a 7,0**.
 7. Los **OA** vienen de un catálogo cerrado de ejemplo cargado en la base; el docente solo los elige.
 8. Muestra reducida: **2 cursos con 8 estudiantes** cada uno.
-9. Sin backend: la EP2 pide solo persistencia local. Retrofit queda configurado para la Experiencia 3 (`data/remote/ApiPendiente.kt`).
+9. Sin backend: los datos se guardan solo en el dispositivo. Retrofit queda configurado para una futura API REST (`data/remote/ApiPendiente.kt`).
 
-## Entrega
+## APK firmado
 
-- ZIP del proyecto **sin** las carpetas `build/`, `app/build/` ni `.gradle/`, con el nombre `EP2_005_<apellido1>_<apellido2>.zip`.
-- Antes de subirlo: descomprimirlo en otra carpeta, abrirlo en Android Studio y comprobar que sincroniza, compila y ejecuta.
-- APK firmado: **Build > Generate Signed App Bundle / APK… > APK > release**. El keystore (`.jks`) y sus claves **no** se suben al repositorio.
+**Build > Generate Signed App Bundle / APK… > APK > release**. El keystore (`.jks`) y sus claves **no** se suben al repositorio.

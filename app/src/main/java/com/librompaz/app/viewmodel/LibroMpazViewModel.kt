@@ -38,7 +38,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/** Estado del formulario de login (patrón Guía 11: data class + StateFlow en el ViewModel). */
+/** Estado del formulario de login (data class + StateFlow en el ViewModel). */
 data class LoginUiState(
     val usuario: String = "",
     val clave: String = "",
@@ -161,7 +161,7 @@ class LibroMpazViewModel(application: Application) : AndroidViewModel(applicatio
     private val _asignaturaSeleccionadaId = MutableStateFlow<String?>(null)
     val asignaturaSeleccionadaId: StateFlow<String?> = _asignaturaSeleccionadaId.asStateFlow()
 
-    /** El curso y la asignatura elegidos se comparten entre pantallas a través del ViewModel (Guía 11). */
+    /** El curso y la asignatura elegidos se comparten entre pantallas a través del ViewModel. */
     fun seleccionarCurso(cursoId: String?, asignaturaId: String? = null) {
         _cursoSeleccionadoId.value = cursoId
         _asignaturaSeleccionadaId.value = asignaturaId

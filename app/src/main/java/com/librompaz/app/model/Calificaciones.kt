@@ -5,7 +5,7 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
-/** Instrumento de evaluación (parte de la "Planilla de calificaciones" del caso). Tabla "evaluaciones". */
+/** Instrumento de evaluación (parte de la "Planilla de calificaciones" del dominio). Tabla "evaluaciones". */
 @Entity(
     tableName = "evaluaciones",
     foreignKeys = [

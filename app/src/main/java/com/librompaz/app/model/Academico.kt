@@ -5,7 +5,7 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
-/** Curso o nivel (entidad "Estudiante y curso" del caso). Tabla "cursos". */
+/** Curso o nivel (entidad "Estudiante y curso" del dominio). Tabla "cursos". */
 @Entity(tableName = "cursos")
 data class Curso(
     @PrimaryKey val id: String,
@@ -35,9 +35,9 @@ data class Estudiante(
 )
 
 /**
- * Asignación de carga docente (entidad del caso): vínculo docente–curso–asignatura.
+ * Asignación de carga docente (entidad del dominio): vínculo docente–curso–asignatura.
  * RF-01: el docente solo ve los cursos y asignaturas bajo su asignación formal.
- * Supuesto (a confirmar con el CITT): un docente puede tener más de una asignatura.
+ * Supuesto: un docente puede tener más de una asignatura.
  */
 @Entity(
     tableName = "cargas_docentes",

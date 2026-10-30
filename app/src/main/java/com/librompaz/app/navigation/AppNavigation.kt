@@ -62,8 +62,8 @@ object Rutas {
  *                        ──> INSPECTORÍA: Panel ──> Asistencia (cualquier curso) | Alertas
  *                        ──> DIRECCIÓN: Panel ──> Auditoría
  *
- * El curso y la asignatura elegidos se comparten a través del ViewModel (como en la Guía 11).
- * Regla del caso: no existe ningún acceso para estudiantes ni apoderados.
+ * El curso y la asignatura elegidos se comparten a través del ViewModel.
+ * Regla de negocio: no existe ningún acceso para estudiantes ni apoderados.
  *
  * Botón atrás: el atrás nativo de Android funciona solo (lo maneja el NavHost). Al ingresar,
  * LOGIN sale de la pila; "Cerrar sesión" limpia la pila completa.
@@ -104,7 +104,7 @@ fun AppNavigation(
     NavHost(
         navController = navController,
         startDestination = Rutas.LOGIN,
-        // Transiciones (Guía 12): la pantalla nueva entra deslizándose y la anterior se desvanece.
+        // Transiciones: la pantalla nueva entra deslizándose y la anterior se desvanece.
         enterTransition = {
             slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(300)) + fadeIn(tween(300))
         },

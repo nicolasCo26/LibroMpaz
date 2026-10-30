@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 
 /**
- * Mensaje de resultado animado (Guía 12: AnimatedVisibility). Aparece con un fundido y
+ * Mensaje de resultado animado (AnimatedVisibility). Aparece con un fundido y
  * expansión, y se oculta solo después de 3 segundos llamando a onOcultar().
  *
  * @param mensaje texto a mostrar (null = oculto).

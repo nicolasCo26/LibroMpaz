@@ -47,10 +47,10 @@ import com.librompaz.app.viewmodel.LibroMpazViewModel
 /**
  * Módulo "Autenticación y alcance por rol": inicio de sesión contra la tabla "usuarios" de Room.
  * Según el perfil (Docente, UTP, Inspectoría o Dirección), AppNavigation lleva a la pantalla
- * principal de cada uno. Regla del caso: no existe acceso para estudiantes ni apoderados.
+ * principal de cada uno. Regla de negocio: no existe acceso para estudiantes ni apoderados.
  *
- * El estado del formulario (correo, clave y errores) vive en el ViewModel (LoginUiState), igual
- * que en la Guía 11; esta pantalla solo lo dibuja y avisa los cambios.
+ * El estado del formulario (correo, clave y errores) vive en el ViewModel (LoginUiState);
+ * esta pantalla solo lo dibuja y avisa los cambios.
  */
 @Composable
 fun LoginScreen(
@@ -59,7 +59,7 @@ fun LoginScreen(
 ) {
     val estado by viewModel.login.collectAsState()
     val datosListos by viewModel.datosListos.collectAsState()
-    // rememberSaveable: se mantiene aunque se gire la pantalla (Guía 12).
+    // rememberSaveable: se mantiene aunque se gire la pantalla.
     var claveVisible by rememberSaveable { mutableStateOf(false) }
 
     Scaffold { padding ->

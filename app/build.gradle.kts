@@ -53,15 +53,14 @@ dependencies {
     // --- Íconos (flecha atrás, mostrar/ocultar clave, agregar, etc.) ---
     implementation(libs.androidx.material.icons.extended)
 
-    // --- Persistencia local: Room (OBLIGATORIO en este caso) + DataStore, ya configurados ---
-    // Ver data/local/PersistenciaPendiente.kt para saber qué crear.
+    // --- Persistencia local: Room + DataStore ---
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.datastore.preferences)
 
     // --- Consumo de API REST (Retrofit + Gson), ya configurado ---
-    // Ver data/remote/ApiPendiente.kt. El caso pide consumir un backend REST (alcance pendiente con el CITT).
+    // Ver data/remote/ApiPendiente.kt.
     implementation(libs.retrofit.core)
     implementation(libs.retrofit.converter.gson)
 
