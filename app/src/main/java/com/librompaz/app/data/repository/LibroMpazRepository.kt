@@ -21,7 +21,7 @@ import kotlinx.coroutines.flow.Flow
  * REPOSITORY: la única puerta de entrada a los datos para el ViewModel.
  *
  * El ViewModel no sabe si los datos vienen de Room, de una API REST o de ambos; solo le pide
- * datos al repositorio. En la Experiencia 3, cuando se agregue Retrofit, se cambia esta clase y
+ * datos al repositorio. Cuando se agregue Retrofit, se cambia esta clase y
  * el ViewModel y las pantallas quedan iguales.
  *
  * Regla de negocio RN-02 (auditoría automática e inalterable): cada función que crea o

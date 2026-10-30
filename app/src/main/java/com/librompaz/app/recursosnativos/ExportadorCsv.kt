@@ -12,14 +12,13 @@ import kotlinx.coroutines.withContext
  *
  * Cómo funciona:
  *  1. La pantalla (PanelDireccionScreen) abre el selector nativo de Android con
- *     rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")),
- *     el mismo mecanismo de la Guía 13 (allí se usó con la cámara y la galería).
+ *     rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")).
  *  2. El usuario elige DÓNDE guardar (Descargas, Drive, etc.) y Android devuelve un Uri.
  *  3. Esta clase escribe el reporte en ese Uri con el ContentResolver.
  *
  * Permisos: NO se necesita declarar ninguno en el AndroidManifest. Con SAF el usuario elige el
  * archivo y Android le da a la app acceso solo a ESE archivo (ni a la galería ni al resto del
- * almacenamiento). Respeta las restricciones del caso: no usa GPS, cámara, micrófono ni
+ * almacenamiento). Respeta las restricciones del proyecto: no usa GPS, cámara, micrófono ni
  * biometría, y la app no envía nada por su cuenta (sin notificaciones, correos ni mensajes).
  */
 object ExportadorCsv {

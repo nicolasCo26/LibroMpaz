@@ -12,10 +12,10 @@ enum class TipoAnotacion(val etiqueta: String) {
 }
 
 /**
- * Anotación de la hoja de vida escolar (entidad del caso), con marca temporal y "firma digital"
+ * Anotación de la hoja de vida escolar (entidad del dominio), con marca temporal y "firma digital"
  * del docente responsable. Tabla "anotaciones".
  *
- * Supuesto (a confirmar con el CITT): la firma digital es el registro automático del usuario
+ * Supuesto: la firma digital es el registro automático del usuario
  * autenticado + fecha y hora, después de una confirmación explícita del docente. Una vez
  * registrada, la anotación no se puede editar ni borrar desde la app.
  */

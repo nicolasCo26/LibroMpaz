@@ -7,7 +7,7 @@ import androidx.room.PrimaryKey
 
 /**
  * Objetivo de Aprendizaje. Tabla "objetivos".
- * Supuesto (a confirmar con el CITT): para el MVP se usa un catálogo cerrado de OA de ejemplo
+ * Supuesto: se usa un catálogo cerrado de OA de ejemplo
  * cargado en la base de datos; el docente solo elige, no crea OA.
  */
 @Entity(
@@ -24,7 +24,7 @@ data class ObjetivoAprendizaje(
 
 /**
  * Sesión o bloque lectivo con los OA y contenidos trabajados (entidad "Trazabilidad y control
- * curricular" del caso). Tabla "sesiones".
+ * curricular" del dominio). Tabla "sesiones".
  *
  * oaIds es una lista: SQLite no tiene columnas de tipo lista, así que data/local/Converters.kt
  * la guarda como texto separado por comas ("OA-MAT-1,OA-MAT-2") y la reconstruye al leer.

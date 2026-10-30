@@ -4,7 +4,7 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 
 /**
- * Registro de auditoría (entidad "Control de seguridad y trazabilidad" del caso). Regla de
+ * Registro de auditoría (entidad "Control de seguridad y trazabilidad" del dominio). Regla de
  * negocio RN-02: toda creación o modificación queda auditada (usuario, fecha y hora) de forma
  * automática e inalterable.
  *

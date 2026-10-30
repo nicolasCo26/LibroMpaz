@@ -13,7 +13,7 @@ enum class EstadoAsistencia(val etiqueta: String, val abreviatura: String) {
 }
 
 /**
- * Registro de asistencia diaria (entidad del caso). registradoPor y fechaHoraRegistro son la
+ * Registro de asistencia diaria (entidad del dominio). registradoPor y fechaHoraRegistro son la
  * "firma" automática exigida por la regla de auditoría.
  *
  * Tabla "asistencias": una fila por estudiante y fecha. Por eso el id se arma como
