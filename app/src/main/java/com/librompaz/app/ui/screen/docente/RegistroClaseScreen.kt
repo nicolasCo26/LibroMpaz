@@ -1,5 +1,6 @@
 package com.librompaz.app.ui.screen.docente
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -21,34 +22,39 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import com.librompaz.app.ui.components.AvisoExito
 import com.librompaz.app.ui.components.BarraSuperior
+import com.librompaz.app.ui.components.CampoFecha
+import com.librompaz.app.ui.components.textoError
 import com.librompaz.app.util.hoy
+import com.librompaz.app.viewmodel.ErroresSesion
 import com.librompaz.app.viewmodel.LibroMpazViewModel
 
 /**
- * Módulo "Cobertura curricular" (docente): registrar los OA y contenidos trabajados en una
- * sesión o bloque, y ver las sesiones ya registradas.
- *
- * TODO(equipo): guardarSesion() todavía no guarda. Validar que se elija al menos un OA y que
- * el contenido no quede vacío.
+ * Módulo "Cobertura curricular" (docente, RF-06): registrar los OA y contenidos trabajados en
+ * una sesión o bloque, y ver las sesiones ya registradas. El ViewModel valida que haya fecha,
+ * bloque, al menos un OA y contenido; los errores se muestran junto a cada campo.
  */
 @Composable
 fun RegistroClaseScreen(navController: NavHostController, viewModel: LibroMpazViewModel) {
     val cursoId by viewModel.cursoSeleccionadoId.collectAsState()
     val asignaturaId by viewModel.asignaturaSeleccionadaId.collectAsState()
     val todas by viewModel.sesiones.collectAsState()
-    val objetivos = viewModel.objetivosDe(asignaturaId)
+    val todosLosOa by viewModel.objetivos.collectAsState()
+    val objetivos = remember(todosLosOa, asignaturaId) { viewModel.objetivosDe(asignaturaId) }
     val registradas = remember(todas, cursoId, asignaturaId) { viewModel.sesionesDe(cursoId, asignaturaId) }
 
-    var fecha by remember { mutableStateOf(hoy()) }
-    var bloque by remember { mutableStateOf("") }
+    var fecha by rememberSaveable { mutableStateOf(hoy()) }
+    var bloque by rememberSaveable { mutableStateOf("") }
     var seleccionados by remember { mutableStateOf(setOf<String>()) }
-    var contenido by remember { mutableStateOf("") }
+    var contenido by rememberSaveable { mutableStateOf("") }
+    var errores by remember { mutableStateOf(ErroresSesion()) }
     var mensaje by remember { mutableStateOf<String?>(null) }
 
     Scaffold(topBar = { BarraSuperior("Registro de clase", navController) }) { padding ->
@@ -61,18 +67,27 @@ fun RegistroClaseScreen(navController: NavHostController, viewModel: LibroMpazVi
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = fecha,
-                    onValueChange = { fecha = it },
-                    label = { Text("Fecha") },
-                    singleLine = true,
+                CampoFecha(
+                    etiqueta = "Fecha",
+                    fecha = fecha,
+                    onFechaChange = {
+                        fecha = it
+                        errores = errores.copy(fecha = null)
+                    },
+                    error = errores.fecha,
                     modifier = Modifier.weight(1f)
                 )
                 OutlinedTextField(
                     value = bloque,
-                    onValueChange = { bloque = it },
+                    onValueChange = {
+                        bloque = it
+                        errores = errores.copy(bloque = null)
+                    },
                     label = { Text("Bloque") },
+                    placeholder = { Text("Bloque 1") },
                     singleLine = true,
+                    isError = errores.bloque != null,
+                    supportingText = textoError(errores.bloque),
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -84,6 +99,7 @@ fun RegistroClaseScreen(navController: NavHostController, viewModel: LibroMpazVi
                         checked = oa.id in seleccionados,
                         onCheckedChange = { marcado ->
                             seleccionados = if (marcado) seleccionados + oa.id else seleccionados - oa.id
+                            errores = errores.copy(objetivos = null)
                         }
                     )
                     Column {
@@ -92,33 +108,51 @@ fun RegistroClaseScreen(navController: NavHostController, viewModel: LibroMpazVi
                     }
                 }
             }
+            errores.objetivos?.let {
+                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            }
 
             OutlinedTextField(
                 value = contenido,
-                onValueChange = { contenido = it },
+                onValueChange = {
+                    contenido = it
+                    errores = errores.copy(contenido = null)
+                },
                 label = { Text("Contenidos abordados") },
                 minLines = 3,
+                isError = errores.contenido != null,
+                supportingText = textoError(errores.contenido),
                 modifier = Modifier.fillMaxWidth()
             )
 
-            mensaje?.let { Text(it, color = MaterialTheme.colorScheme.secondary) }
+            AvisoExito(mensaje = mensaje, onOcultar = { mensaje = null })
 
             Button(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = {
-                    viewModel.guardarSesion(cursoId.orEmpty(), asignaturaId.orEmpty(), fecha, bloque.trim(), seleccionados.toList(), contenido.trim())
-                    mensaje = "Clase enviada a guardar (cuando guardarSesion() esté implementada)."
+                    errores = viewModel.guardarSesion(
+                        cursoId.orEmpty(), asignaturaId.orEmpty(), fecha, bloque, seleccionados.toList(), contenido
+                    ) {
+                        mensaje = "Clase del $fecha registrada."
+                        bloque = ""
+                        seleccionados = emptySet()
+                        contenido = ""
+                    }
                 }
             ) { Text("Guardar clase") }
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
             Text("Clases registradas (${registradas.size})", style = MaterialTheme.typography.titleSmall)
+            if (registradas.isEmpty()) {
+                Text("Todavía no hay clases registradas.", style = MaterialTheme.typography.bodySmall)
+            }
             registradas.forEach { sesion ->
-                Card(modifier = Modifier.fillMaxWidth()) {
+                Card(modifier = Modifier.fillMaxWidth().animateContentSize()) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text("${sesion.fecha} · ${sesion.bloque}", style = MaterialTheme.typography.titleSmall)
                         Text(sesion.contenido, style = MaterialTheme.typography.bodySmall)
-                        Text("OA: ${sesion.oaIds.size} · Registró: ${sesion.registradoPor}", style = MaterialTheme.typography.labelSmall)
+                        val codigos = sesion.oaIds.mapNotNull { id -> objetivos.find { it.id == id }?.codigo }
+                        Text("OA: ${codigos.joinToString(", ")} · Registró: ${sesion.registradoPor}", style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }

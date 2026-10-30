@@ -38,7 +38,7 @@ object MockData {
         Usuario("U2", DOCENTE_LEN, "docente.len@libromp.cl", "docente123", Perfil.DOCENTE),
         Usuario("U3", "Coordinación UTP", "utp@libromp.cl", "utp123", Perfil.UTP),
         Usuario("U4", "Inspectoría General", "inspectoria@libromp.cl", "inspectoria123", Perfil.INSPECTORIA),
-        Usuario("U5", "Dirección", "direccion@libromp.cl", "direccion123", Perfil.DIRECCION),
+        Usuario("U5", "Equipo Directivo", "direccion@libromp.cl", "direccion123", Perfil.DIRECCION),
     )
 
     val cursos = listOf(Curso("C3A", "3° Básico A"), Curso("C4A", "4° Básico A"))
