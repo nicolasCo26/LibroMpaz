@@ -10,3 +10,5 @@
 app/build/
 *.jks
 *.keystore
+# La llave de este proyecto se entrega a propósito junto al APK firmado.
+!keystore/librompaz-release.jks
