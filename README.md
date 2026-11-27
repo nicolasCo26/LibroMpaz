@@ -2,118 +2,186 @@
 
 Aplicación Android para la Escuela Escritora Marcela Paz (San Bernardo). Reemplaza el libro de clases en papel (asistencia, cobertura curricular, calificaciones y hoja de vida) por una app con vistas por perfil: **Docente, UTP, Inspectoría y Dirección**.
 
-Kotlin · Jetpack Compose · Material 3 · MVVM · Room (SQLite).
+Kotlin · Jetpack Compose · Material 3 · MVVM · Room · Retrofit · Microservicios Spring Boot.
 
-## Equipo
+| Repositorio | Contenido |
+|---|---|
+| **App móvil (este repositorio):** https://github.com/nicolasCo26/LibroMpaz | App Android, pruebas, APK firmado y llave |
+| **Microservicios:** https://github.com/nicolasCo26/LibroMpaz-Microservicios | `ms-calificaciones` y `ms-anotaciones` (Spring Boot + H2) |
+
+## Integrantes
 
 | Nombre | Usuario GitHub | Qué desarrolló |
 |---|---|---|
-| Nicolás Navarrete Reyes | [nicolasCo26](https://github.com/nicolasCo26) | Persistencia con Room, ViewModel y reglas, asistencia, calificaciones, recurso nativo y panel de Dirección |
+| Nicolás Navarrete Reyes | [nicolasCo26](https://github.com/nicolasCo26) | Persistencia con Room, ViewModel y reglas, asistencia, calificaciones, recurso nativo, microservicios e integración con Retrofit, pruebas y firma del APK |
 | Camila Leiva | [alemi-vy](https://github.com/alemi-vy) | Login y navegación por rol, pantallas del docente (clase y hoja de vida), paneles de UTP e Inspectoría, README |
 
-**Repositorio:** https://github.com/nicolasCo26/LibroMpaz. Cada funcionalidad se desarrolló en su propia rama (`feat/...`) y se integró a `main` con un Pull Request.
+**Planificación:** tablero de Trello con las tareas repartidas por integrante: <ENLACE_TRELLO>. Cada funcionalidad se desarrolló en su propia rama (`feat/...`) y se integró a `main` con un Pull Request.
 
-## Cómo ejecutar
+## Funcionalidades
 
-1. Clonar el repositorio o descomprimir el proyecto en una carpeta limpia.
-2. Android Studio → **File > Open…** → seleccionar la carpeta que contiene `settings.gradle.kts`.
-3. Esperar el Gradle Sync (la primera vez necesita internet).
-4. Ejecutar ▶ **Run 'app'** en un emulador o dispositivo (API 24 o superior).
+| Perfil | Qué puede hacer |
+|---|---|
+| Docente | Ver solo sus cursos y asignaturas · pasar asistencia (P/A/T/J) · registrar la clase con OA y contenidos · **crear, editar y eliminar evaluaciones e ingresar notas (microservicio)** · **registrar, corregir y eliminar anotaciones de la hoja de vida (microservicio)** · ver los próximos feriados (API externa) |
+| UTP | Cobertura curricular por curso y asignatura · revisión de evaluaciones sin notas o incompletas |
+| Inspectoría | Asistencia de todos los cursos · alertas por inasistencias reiteradas y anotaciones negativas · próximos feriados |
+| Dirección | Métricas por curso · auditoría de cambios · exportar reporte CSV (recurso nativo) |
 
-Si Android Studio sugiere actualizar Gradle o el Android Gradle Plugin, **no aceptar**. El proyecto compila con JDK 17 o 21 (*Settings > Build Tools > Gradle > Gradle JDK*), no con JDK 25. Versiones: Kotlin 2.0.0 · AGP 8.5.2 · Gradle 8.7 · Room 2.6.1 · KSP 2.0.0-1.0.24.
+Además: validación de formularios con el error bajo cada campo, confirmación antes de sobrescribir o borrar, auditoría automática de cada cambio, aviso si la fecha de asistencia es feriado y aviso de "sin conexión" con botón **Reintentar** cuando los microservicios no responden.
 
-La primera vez que se abre, la app crea la base de datos `libro_mpaz.db` y la llena con datos ficticios (`data/MockData.kt`). Para volver a los datos iniciales: **Ajustes del teléfono > Apps > Libro MPAZ > Almacenamiento > Borrar datos**.
+## Endpoints utilizados
 
-**Pruebas unitarias:** clic derecho en `app/src/test/java/com/librompaz/app` → **Run 'Tests in…'** (`ValidacionesTest` y `MetricasTest`).
+### Microservicios propios (Spring Boot, ver repositorio de microservicios)
 
-## Usuarios de prueba (ficticios)
-
-| Perfil | Correo | Clave | Qué ve |
-|---|---|---|---|
-| Docente | docente.mat@libromp.cl | docente123 | Matemática en 3° Básico A y 4° Básico A |
-| Docente | docente.len@libromp.cl | docente123 | Lenguaje en 4° Básico A y Ciencias en 3° Básico A |
-| UTP | utp@libromp.cl | utp123 | Cobertura curricular y revisión de notas |
-| Inspectoría | inspectoria@libromp.cl | inspectoria123 | Asistencia de todos los cursos y alertas |
-| Dirección | direccion@libromp.cl | direccion123 | Métricas por curso, auditoría y exportación |
-
-## Requerimientos implementados
-
-| Requerimiento | Cómo se cumple | Dónde |
+| Microservicio | Método y ruta | Uso en la app |
 |---|---|---|
-| RF-01 Autenticar y mostrar solo las cargas del docente | Login contra la tabla `usuarios`; `cargasDe(docenteId)` filtra en SQL | `LoginScreen`, `MisCursosScreen`, `AcademicoDao` |
-| RF-02 Control de acceso por rol (RBAC) | Cada ruta declara sus perfiles permitidos (`protegida(...)`) y el ViewModel revisa la carga antes de guardar | `AppNavigation`, `LibroMpazViewModel.tieneCarga()` |
-| RF-03 Asistencia P / A / T / J | Registro diario por curso; se puede corregir un día ya registrado | `AsistenciaScreen` |
-| RF-04 Asistencia en menos de un minuto | Todos parten "presente", botón "Todos presentes" y resumen del día | `AsistenciaScreen` |
-| RF-05 Inspectoría gestiona la asistencia de todos los niveles | Porcentaje por curso y acceso a registrar o corregir cualquier curso | `PanelInspectoriaScreen` |
-| RF-06 OA y contenidos por sesión | Fecha, bloque, OA (catálogo) y contenidos, con validaciones | `RegistroClaseScreen` |
-| RF-07 Cobertura curricular para UTP | OA trabajados y pendientes por curso y asignatura, con % de avance | `CoberturaCurricularScreen` |
-| RF-08 Calificaciones con instrumento y fecha | Crear, eliminar evaluaciones; ingresar y corregir notas 1,0 a 7,0 | `CalificacionesScreen` |
-| RF-09 Desfases u omisiones de notas | Cargas sin evaluaciones y evaluaciones con notas faltantes | `RevisionCalificacionesScreen` |
-| RF-10 Anotaciones con marca temporal y firma | Usuario + fecha y hora automáticas, después de confirmar | `HojaDeVidaScreen` |
-| RF-11 Riesgo e inasistencias reiteradas | Alertas con 3+ ausencias o 2+ anotaciones negativas; hoja de vida filtrable | `AlertasInspectoriaScreen` |
-| RF-12 Estado global para Dirección | Asistencia, clases, notas y anotaciones negativas por curso | `PanelDireccionScreen` |
-| RN-01 Sin acceso de estudiantes ni apoderados | Solo existen los 4 perfiles internos | `Perfil`, `MockData.usuarios` |
-| RN-02 Auditoría automática e inalterable | Cada escritura guarda su auditoría en la misma transacción; el DAO de auditoría no tiene update ni delete | `LibroMpazRepository`, `AuditoriaDao`, `AuditoriaScreen` |
-| RNF-01 Interfaz simple y rápida | Pantallas de una sola tarea; Room local, sin red | — |
-| RNF-02 Confirmación antes de sobrescribir o borrar | Diálogos al sobrescribir asistencia o notas, eliminar evaluación y registrar anotación | Pantallas del docente |
-| RNF-03 Sin GPS, cámara, micrófono ni biometría | No se declara ningún permiso en el `AndroidManifest` | — |
-| RNF-04 Datos 100 % ficticios | "Estudiante 3A-01", correos `@libromp.cl` | `MockData.kt` |
+| ms-calificaciones `:8081` | `GET /api/evaluaciones` | Sincronizar evaluaciones al abrir Calificaciones, Revisión UTP y Panel Dirección |
+| | `POST /api/evaluaciones` | Botón **Crear** (nueva evaluación) |
+| | `PUT /api/evaluaciones/{id}` | Ícono de lápiz: corregir nombre o fecha |
+| | `DELETE /api/evaluaciones/{id}` | Ícono de basurero: eliminar la evaluación y sus notas |
+| | `GET /api/calificaciones` | Sincronizar todas las notas |
+| | `PUT /api/evaluaciones/{id}/calificaciones` | **Guardar notas** (reemplaza la planilla completa) |
+| ms-anotaciones `:8082` | `GET /api/anotaciones` | Sincronizar la hoja de vida (Docente, Alertas de Inspectoría, Dirección) |
+| | `POST /api/anotaciones` | **Registrar anotación** (el servidor pone fecha y hora de la firma) |
+| | `PUT /api/anotaciones/{id}` | Corregir tipo o descripción (solo quien la firmó, si no responde 403) |
+| | `DELETE /api/anotaciones/{id}?solicitante=...` | Eliminar (solo quien la firmó) |
 
-## Recurso nativo: almacenamiento con el selector de archivos del sistema
+### API externa
 
-**Qué hace:** en el Panel de Dirección, **"Exportar reporte (CSV)"** abre el selector nativo de Android ("Guardar como"). El usuario elige dónde guardar y la app escribe un archivo CSV con las métricas por curso, que se puede abrir en Excel.
+| API | Endpoint | Uso en la app |
+|---|---|---|
+| [Nager.Date](https://date.nager.at) (pública, sin clave) | `GET https://date.nager.at/api/v3/PublicHolidays/{año}/CL` | Tarjeta "Próximos feriados" en Mis cursos y Panel Inspectoría, y aviso en Asistencia si el día es feriado. Solo se lee: no se guarda en Room ni en los microservicios. |
 
-**Por qué es pertinente:** el colegio está obligado a mantener registros de asistencia y avance académico, y Dirección necesita respaldarlos o presentarlos. Hoy esos resúmenes se hacen a mano a partir de los cuadernos. El reporte:
-- contiene **solo métricas consolidadas por curso**, sin nombres de estudiantes (resguarda la privacidad, RN-01);
-- solo lo puede generar el perfil **Dirección**;
-- queda registrado en la **auditoría** (acción `EXPORTAR`).
+**Diferencia:** los microservicios son nuestros, guardan los datos del colegio y la app hace CRUD sobre ellos (`LibroMpazRepository`). La API externa es de terceros y de solo lectura: tiene su propio repositorio (`FeriadosRepository`) y su propio ViewModel (`FeriadosViewModel`), así que si falla no afecta a los datos del colegio.
 
-**Cómo respeta las restricciones del proyecto:** no usa GPS, cámara, micrófono ni biometría (RNF-03), y la app no envía nada por su cuenta: no hay notificaciones, correos ni mensajes. El archivo se guarda donde el usuario decide.
+## Pasos para ejecutar
 
-**Integración y permisos:** se usa `rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv"))`. Android devuelve un `Uri` y `ExportadorCsv` escribe en él con el `ContentResolver`, en `Dispatchers.IO`. **No requiere declarar permisos**: con Storage Access Framework el usuario elige el archivo y la app solo recibe acceso a ese archivo. Si el usuario cancela, se muestra "Exportación cancelada" y la app no falla.
+### 1. Levantar los microservicios (computador)
 
-Archivos: `recursosnativos/ExportadorCsv.kt`, `ui/screen/direccion/PanelDireccionScreen.kt` y `LibroMpazViewModel.exportarReporte()`.
+Requiere JDK 21. En el repositorio de microservicios, en dos terminales:
+
+```bash
+cd ms-calificaciones && ./mvnw spring-boot:run     # Windows: mvnw.cmd spring-boot:run  -> puerto 8081
+cd ms-anotaciones    && ./mvnw spring-boot:run     # -> puerto 8082
+```
+
+Comprobar: abrir http://localhost:8081/api/evaluaciones y http://localhost:8082/api/anotaciones. La base H2 se ve en http://localhost:8081/h2-console (JDBC URL `jdbc:h2:file:./data/calificaciones`, usuario `sa`, sin clave).
+
+### 2. Ejecutar la app (Android Studio)
+
+1. **File > Open…** → la carpeta que contiene `settings.gradle.kts`. Esperar el Gradle Sync (necesita internet).
+2. Gradle JDK 17 o 21 (*Settings > Build Tools > Gradle > Gradle JDK*), no JDK 25. Si sugiere actualizar Gradle o AGP, **no aceptar**.
+3. ▶ **Run 'app'** en un emulador (API 24 o superior).
+
+El emulador llega al computador por `10.0.2.2` (configurado en `app/build.gradle.kts`). En un teléfono físico, cambiar esa IP por la del computador en la misma red Wi-Fi y agregarla en `res/xml/network_security_config.xml`.
+
+Si los microservicios están apagados la app no se cae: muestra la última copia guardada y el aviso "Sin conexión con el servidor" con **Reintentar**.
+
+### Usuarios de prueba (ficticios)
+
+| Perfil | Correo | Clave |
+|---|---|---|
+| Docente (Matemática 3°A y 4°A) | docente.mat@libromp.cl | docente123 |
+| Docente (Lenguaje 4°A y Ciencias 3°A) | docente.len@libromp.cl | docente123 |
+| UTP | utp@libromp.cl | utp123 |
+| Inspectoría | inspectoria@libromp.cl | inspectoria123 |
+| Dirección | direccion@libromp.cl | direccion123 |
+
+## Pruebas
+
+### Unitarias (JVM, Kotest + MockK + coroutines-test) — `app/src/test`
+
+```bash
+./gradlew testDebugUnitTest           # Windows: gradlew.bat testDebugUnitTest
+./gradlew koverHtmlReportDebug        # cobertura -> app/build/reports/kover/htmlDebug/index.html
+./gradlew koverVerifyDebug            # falla si la cobertura de la lógica baja de 80 %
+```
+
+| Clase de prueba | Qué prueba | Qué se simula (mock) |
+|---|---|---|
+| `LibroMpazRepositoryTest` | POST/PUT/DELETE a los microservicios y que la copia local solo cambie si el servidor responde bien; sincronización; auditoría | DAO de Room y APIs Retrofit |
+| `LibroMpazViewModelTest` | Login, permisos por rol, validaciones, mensajes de error de red (sin conexión, 403, 404), métricas | `LibroMpazRepository` |
+| `FeriadosViewModelTest` | Estados Cargando / Éxito / Error de la API externa y próximos feriados | `FeriadosApi` y `FeriadosRepository` |
+| `ErroresRedTest`, `ValidacionesTest`, `MetricasTest` | Reglas puras (sin mocks) | — |
+
+Resultado: **65 pruebas, 0 fallos**. Cobertura de la lógica (`viewmodel` + `data.repository`): **97 % de líneas**.
+
+### De interfaz (instrumentadas, se ven en el emulador) — `app/src/androidTest`
+
+Con el emulador abierto: clic derecho en `app/src/androidTest/java/com/librompaz/app` → **Run 'Tests in…'**, o:
+
+```bash
+./gradlew connectedDebugAndroidTest
+```
+
+- `FlujoAppTest`: login vacío, clave incorrecta, docente que pasa asistencia y vuelve, Inspectoría con feriados.
+- `TarjetaFeriadosTest`: la tarjeta de feriados con una API falsa (éxito, error y Reintentar).
+- `CalificacionesMicroservicioTest`: crea y elimina una evaluación desde la pantalla contra `ms-calificaciones` (**requiere los microservicios encendidos**).
+
+## APK firmado
+
+- APK: [`release/LibroMpaz-v2.0-release.apk`](release/LibroMpaz-v2.0-release.apk)
+- Llave: [`keystore/librompaz-release.jks`](keystore/librompaz-release.jks) (alias `librompaz`, RSA 2048, 10.000 días)
+- Configuración: `signingConfigs.release` en `app/build.gradle.kts`, que lee `keystore.properties`.
+
+![Verificación de la firma del APK y de la llave .jks](docs/img/firma-apk-jks.png)
+
+El SHA-256 del certificado del APK es el mismo de la llave: el APK quedó firmado con ese `.jks`.
+
+**Cómo se generó:**
+1. Llave: Android Studio → **Build > Generate Signed App Bundle / APK > APK > Create new…** (o `keytool -genkeypair -keystore keystore/librompaz-release.jks -alias librompaz -keyalg RSA -keysize 2048 -validity 10000`).
+2. Variante **release**, firma V2. Por consola: `./gradlew assembleRelease` usa `keystore.properties`.
+3. Verificación: `apksigner verify --print-certs app/build/outputs/apk/release/app-release.apk`.
+
+> La llave y sus claves se incluyen en el repositorio solo porque la entrega lo exige. En una app real, `keystore.properties` y el `.jks` quedan fuera de Git.
 
 ## Arquitectura (MVVM)
 
 ```
-Pantalla (@Composable) ──evento──> ViewModel ──> Repository ──> DAO ──> Room (SQLite)
-        ^                            │ valida                          │
-        └──── collectAsState() <── StateFlow <──────── Flow <──────────┘
+Pantalla (@Composable) ──evento──> ViewModel ──> Repository ──┬──> Retrofit ──> Microservicios (Spring Boot + H2)
+        ^                            │ valida                 └──> DAO ──> Room (copia local)
+        └──── collectAsState() <── StateFlow <──────── Flow de Room ──┘
 ```
 
-| Capa | Archivos | Responsabilidad |
-|---|---|---|
-| Entity | `model/*.kt` (`@Entity`) | Las 12 tablas: usuarios, cursos, asignaturas, estudiantes, cargas_docentes, asistencias, objetivos, sesiones, evaluaciones, calificaciones, anotaciones y auditoria. Claves foráneas entre ellas. |
-| DAO | `data/local/Daos.kt` | Consultas. Las lecturas observables devuelven `Flow`; las escrituras son `suspend`. |
-| Database | `data/local/AppDatabase.kt`, `Converters.kt` | Une entidades y DAOs con una sola instancia (singleton). El converter guarda la lista de OA como texto. |
-| Repository | `data/repository/LibroMpazRepository.kt` | Única puerta a los datos; cada escritura y su auditoría van en `withTransaction`. |
-| ViewModel | `viewmodel/LibroMpazViewModel.kt` | Estado (`StateFlow`), permisos por rol y orquestación con `viewModelScope`. |
-| Reglas | `viewmodel/Validaciones.kt`, `viewmodel/Metricas.kt` | Validaciones y cálculos como funciones puras, con pruebas en `app/src/test`. |
-| UI | `ui/screen/**`, `ui/components/**` | Pantallas Compose + Material 3 que solo dibujan el estado y avisan los eventos. |
-| Navegación | `navigation/AppNavigation.kt` | NavHost, rutas por perfil, transiciones y cierre de sesión que limpia la pila. |
+Toda escritura de evaluaciones, notas o anotaciones va **primero al microservicio**; solo si responde bien se actualiza la copia en Room y se registra la auditoría (en la misma transacción). Las pantallas observan Room, así que se redibujan solas.
 
-**Ejemplo de cómo viaja un dato (guardar una nota):** `CalificacionesScreen` → `viewModel.guardarCalificaciones()` valida con `validarNota()` → `repository.guardarCalificaciones()` abre una transacción → `CalificacionDao.guardarNotas()` (REPLACE) + `AuditoriaDao.insertar()` → Room emite el `Flow` de calificaciones → `viewModel.calificaciones` (StateFlow) → la pantalla se redibuja.
+| Paquete | Responsabilidad |
+|---|---|
+| `model/` | Entidades de Room (12 tablas) y enums. Evaluación, Calificación y Anotación se reutilizan como JSON de los microservicios. |
+| `data/local/` | DAO, `AppDatabase` (singleton) y `Converters`. |
+| `data/remote/` | `RetrofitClient` (una instancia por URL base), `CalificacionesApi`, `AnotacionesApi`, `FeriadosApi` y sus DTO. |
+| `data/repository/` | `LibroMpazRepository` (microservicios + Room + auditoría) y `FeriadosRepository` (API externa). |
+| `viewmodel/` | `LibroMpazViewModel`, `FeriadosViewModel` (UiState Cargando/Éxito/Error), validaciones, métricas y mensajes de error de red. |
+| `ui/` | Pantallas Compose por perfil y componentes (`AvisoServidor`, `TarjetaFeriados`, `AvisoExito`…). |
+| `navigation/` | `NavHost`, rutas protegidas por perfil (RBAC) y cierre de sesión. |
+| `recursosnativos/` | `ExportadorCsv` (selector de archivos del sistema). |
 
-## Formularios, validaciones y animaciones
+## Requerimientos implementados
 
-- **Validaciones (ViewModel / `Validaciones.kt`):** correo con formato válido y clave obligatoria; fechas obligatorias y no futuras (además, el calendario no deja elegir días futuros); nota de 1,0 a 7,0 con un decimal, que acepta coma o punto; nombre del instrumento de 3 a 60 caracteres; sesión con bloque, al menos un OA y contenido de 10 caracteres o más; anotación con estudiante, tipo y descripción de 10 a 300 caracteres. El error aparece **bajo el campo** (`isError` + `supportingText`).
-- **Mensajes de éxito** animados (`AvisoExito`, con `AnimatedVisibility`) y **confirmaciones** (`AlertDialog`) antes de acciones destructivas.
-- **Animaciones:** transiciones entre pantallas (deslizar y desvanecer), color animado de los estados de asistencia (`animateColorAsState`), barras de avance animadas (`animateFloatAsState`), planilla de notas que aparece al elegir una evaluación (`AnimatedVisibility`), `animateContentSize` y `animateItem` en listas, y un indicador de carga mientras se prepara la base.
-- **Componentes interactivos:** `DatePickerDialog`, listas desplegables (`ExposedDropdownMenuBox`), `FilterChip`, `Checkbox` y diálogos.
+| Requerimiento | Cómo se cumple |
+|---|---|
+| RF-01 / RF-02 Login y acceso por rol | Login contra Room; `cargasDe(docenteId)` filtra en SQL; cada ruta declara sus perfiles (`protegida(...)`) y el ViewModel revisa la carga antes de guardar |
+| RF-03 / RF-04 / RF-05 Asistencia | P/A/T/J, "Todos presentes", corrección de días anteriores; Inspectoría gestiona todos los cursos |
+| RF-06 / RF-07 Cobertura curricular | Sesiones con OA y contenidos; avance de OA para UTP |
+| RF-08 / RF-09 Calificaciones | CRUD de evaluaciones y notas 1,0 a 7,0 en `ms-calificaciones`; desfases para UTP |
+| RF-10 / RF-11 Hoja de vida | Anotaciones firmadas (usuario + hora del servidor) en `ms-anotaciones`; alertas de riesgo |
+| RF-12 Estado global | Métricas por curso para Dirección |
+| RN-01 Sin acceso de estudiantes ni apoderados | Solo existen los 4 perfiles internos |
+| RN-02 Auditoría inalterable | Cada cambio guarda su auditoría en la misma transacción; el DAO de auditoría no tiene update ni delete |
+| RNF-02 Confirmación | Diálogos antes de sobrescribir o eliminar |
+| RNF-03 Sin GPS, cámara, micrófono ni biometría | Único permiso: `INTERNET` (permiso normal, sin diálogo al usuario) |
+| RNF-04 Datos ficticios | "Estudiante 3A-01", correos `@libromp.cl` |
+
+## Recurso nativo: selector de archivos del sistema
+
+En el Panel de Dirección, **"Exportar reporte (CSV)"** abre el selector nativo ("Guardar como") con `ActivityResultContracts.CreateDocument("text/csv")`. `ExportadorCsv` escribe en el `Uri` elegido con el `ContentResolver`, en `Dispatchers.IO`. No requiere permisos (Storage Access Framework). El reporte solo trae métricas por curso, sin nombres de estudiantes, y la exportación queda en la auditoría.
 
 ## Decisiones de diseño
 
-1. Un docente puede tener más de una asignatura (en los datos, el docente de Lenguaje también hace Ciencias).
-2. Los cuatro perfiles son excluyentes: cada usuario tiene un solo rol.
-3. **Firma digital** = usuario autenticado + fecha y hora automáticas, tras una confirmación explícita. Las anotaciones no se editan ni se borran.
-4. Se puede **corregir la asistencia** de días anteriores. La corrección pide confirmación y queda auditada como `MODIFICAR`.
-5. El estado "justificado" no requiere adjuntar un respaldo.
-6. Las notas se validan en el rango **1,0 a 7,0**.
-7. Los **OA** vienen de un catálogo cerrado de ejemplo cargado en la base; el docente solo los elige.
-8. Muestra reducida: **2 cursos con 8 estudiantes** cada uno.
-9. Sin backend: los datos se guardan solo en el dispositivo. Retrofit queda configurado para una futura API REST (`data/remote/ApiPendiente.kt`).
-
-## APK firmado
-
-**Build > Generate Signed App Bundle / APK… > APK > release**. El keystore (`.jks`) y sus claves **no** se suben al repositorio.
+1. Un docente puede tener más de una asignatura.
+2. **Firma digital** = usuario autenticado + fecha y hora que pone el servidor. Solo quien firmó puede corregir o eliminar una anotación; el microservicio lo valida (403).
+3. Se puede corregir la asistencia de días anteriores (queda auditado como `MODIFICAR`).
+4. Notas de **1,0 a 7,0**, validadas en la app y en el microservicio.
+5. Los ids los genera la app (UUID), así el mismo registro tiene el mismo id en el teléfono y en el servidor.
+6. Room funciona como copia local: si no hay red, se sigue viendo la información y no se pierde nada (las escrituras simplemente no se hacen y se avisa).
+7. Muestra reducida: 2 cursos con 8 estudiantes cada uno.
