@@ -16,7 +16,9 @@ Kotlin · Jetpack Compose · Material 3 · MVVM · Room · Retrofit · Microserv
 | Nicolás Navarrete Reyes | [nicolasCo26](https://github.com/nicolasCo26) | Persistencia con Room, ViewModel y reglas, asistencia, calificaciones, recurso nativo, microservicios e integración con Retrofit, pruebas y firma del APK |
 | Camila Leiva | [alemi-vy](https://github.com/alemi-vy) | Login y navegación por rol, pantallas del docente (clase y hoja de vida), paneles de UTP e Inspectoría, README |
 
-**Planificación y control de versiones:** cada funcionalidad se desarrolló en su propia rama (`feat/...`, `test/...`, `release/...`) y se integró a `main` con un Pull Request: [PR de la app](https://github.com/nicolasCo26/LibroMpaz/pulls?q=is%3Apr) y [PR de los microservicios](https://github.com/nicolasCo26/LibroMpaz-Microservicios/pulls?q=is%3Apr).
+**Planificación:** tareas del hito [EP4 · Microservicios, pruebas y APK firmado](https://github.com/nicolasCo26/LibroMpaz/milestone/1?closed=1) (una issue por tarea, con responsable, etiqueta y el PR que la resolvió).
+
+**Control de versiones:** cada funcionalidad se desarrolló en su propia rama (`feat/...`, `test/...`, `release/...`) y se integró a `main` con un Pull Request: [PR de la app](https://github.com/nicolasCo26/LibroMpaz/pulls?q=is%3Apr) y [PR de los microservicios](https://github.com/nicolasCo26/LibroMpaz-Microservicios/pulls?q=is%3Apr).
 
 ## Funcionalidades
 
