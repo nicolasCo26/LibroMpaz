@@ -24,6 +24,8 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.librompaz.app.navigation.Rutas
 import com.librompaz.app.ui.components.BarraSuperior
+import com.librompaz.app.ui.components.TarjetaFeriados
+import com.librompaz.app.viewmodel.FeriadosViewModel
 import com.librompaz.app.viewmodel.LibroMpazViewModel
 
 /**
@@ -35,6 +37,7 @@ import com.librompaz.app.viewmodel.LibroMpazViewModel
 fun PanelInspectoriaScreen(
     navController: NavHostController,
     viewModel: LibroMpazViewModel,
+    feriadosViewModel: FeriadosViewModel,
     onCerrarSesion: () -> Unit
 ) {
     val usuario by viewModel.usuarioActivo.collectAsState()
@@ -54,6 +57,7 @@ fun PanelInspectoriaScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text("Hola, ${usuario?.nombre.orEmpty()}", style = MaterialTheme.typography.titleLarge)
+            TarjetaFeriados(feriadosViewModel)
 
             Button(modifier = Modifier.fillMaxWidth(), onClick = { navController.navigate(Rutas.INSP_ALERTAS) }) {
                 Text("Alertas: inasistencias y hoja de vida ($totalAlertas)")

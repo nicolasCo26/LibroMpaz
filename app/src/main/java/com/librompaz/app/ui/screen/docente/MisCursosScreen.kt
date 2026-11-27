@@ -25,6 +25,8 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.librompaz.app.navigation.Rutas
 import com.librompaz.app.ui.components.BarraSuperior
+import com.librompaz.app.ui.components.TarjetaFeriados
+import com.librompaz.app.viewmodel.FeriadosViewModel
 import com.librompaz.app.viewmodel.LibroMpazViewModel
 
 /**
@@ -35,6 +37,7 @@ import com.librompaz.app.viewmodel.LibroMpazViewModel
 fun MisCursosScreen(
     navController: NavHostController,
     viewModel: LibroMpazViewModel,
+    feriadosViewModel: FeriadosViewModel,
     onCerrarSesion: () -> Unit
 ) {
     val usuario by viewModel.usuarioActivo.collectAsState()
@@ -56,6 +59,7 @@ fun MisCursosScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(bottom = 12.dp)
             )
+            TarjetaFeriados(feriadosViewModel, modifier = Modifier.padding(bottom = 12.dp))
             if (cargas.isEmpty()) {
                 Text("No tienes cursos asignados.", style = MaterialTheme.typography.bodyMedium)
             }
