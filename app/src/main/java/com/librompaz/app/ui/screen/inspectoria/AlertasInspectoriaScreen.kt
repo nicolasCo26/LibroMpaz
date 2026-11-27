@@ -17,6 +17,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.librompaz.app.model.TipoAnotacion
+import com.librompaz.app.ui.components.AvisoServidor
 import com.librompaz.app.ui.components.BarraSuperior
 import com.librompaz.app.viewmodel.LibroMpazViewModel
 import com.librompaz.app.viewmodel.UMBRAL_ANOTACIONES_NEGATIVAS
@@ -44,6 +46,9 @@ fun AlertasInspectoriaScreen(navController: NavHostController, viewModel: LibroM
     var filtro by remember { mutableStateOf<TipoAnotacion?>(null) }   // null = todas
     val hojaDeVida = remember(todas, filtro) { viewModel.anotacionesPorTipo(filtro) }
 
+    // Trae de los microservicios las notas y anotaciones más recientes.
+    LaunchedEffect(Unit) { viewModel.sincronizar() }
+
     Scaffold(topBar = { BarraSuperior("Alertas", navController) }) { padding ->
         Column(
             modifier = Modifier
@@ -53,6 +58,7 @@ fun AlertasInspectoriaScreen(navController: NavHostController, viewModel: LibroM
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            AvisoServidor(viewModel)
             Text("Inasistencias reiteradas ($UMBRAL_INASISTENCIAS o más ausencias)", style = MaterialTheme.typography.titleSmall)
             if (inasistencias.isEmpty()) Text("Sin alertas.", style = MaterialTheme.typography.bodySmall)
             inasistencias.forEach { (estudiante, ausencias) ->

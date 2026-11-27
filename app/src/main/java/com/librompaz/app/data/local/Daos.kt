@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 import com.librompaz.app.model.Anotacion
 import com.librompaz.app.model.Asignatura
 import com.librompaz.app.model.Calificacion
@@ -26,6 +27,8 @@ import kotlinx.coroutines.flow.Flow
 //    lista nueva cada vez que la tabla cambia, y la pantalla se actualiza sola.
 //  - Las escrituras y las lecturas puntuales son suspend: tocan el disco y no pueden
 //    ejecutarse en el hilo principal.
+//  - Evaluaciones, notas y anotaciones viven en los microservicios. Estas tablas son la COPIA
+//    LOCAL (caché) que se reemplaza con lo que responde el servidor.
 // =====================================================================================
 
 /** Módulo "Autenticación y alcance por rol". */
@@ -62,6 +65,16 @@ interface AcademicoDao {
 
     @Query("SELECT * FROM cargas_docentes")
     fun cargas(): Flow<List<CargaDocente>>
+
+    // Ids válidos: lo que llega del servidor se filtra con ellos para respetar las claves foráneas.
+    @Query("SELECT id FROM cursos")
+    suspend fun idsCursos(): List<String>
+
+    @Query("SELECT id FROM asignaturas")
+    suspend fun idsAsignaturas(): List<String>
+
+    @Query("SELECT id FROM estudiantes")
+    suspend fun idsEstudiantes(): List<String>
 
     // RBAC (RF-01): SOLO las cargas del docente indicado.
     @Query("SELECT * FROM cargas_docentes WHERE docenteId = :docenteId")
@@ -132,31 +145,43 @@ interface CalificacionDao {
     @Insert
     suspend fun insertarEvaluaciones(evaluaciones: List<Evaluacion>)
 
+    @Update
+    suspend fun actualizarEvaluacion(evaluacion: Evaluacion)
+
     // Al borrar la evaluación, sus notas se borran solas (ForeignKey.CASCADE en Calificacion).
     @Delete
     suspend fun eliminarEvaluacion(evaluacion: Evaluacion)
+
+    /** Vacía la copia local antes de cargar lo que respondió el microservicio (CASCADE borra las notas). */
+    @Query("DELETE FROM evaluaciones")
+    suspend fun eliminarTodasLasEvaluaciones()
 
     // REPLACE: el id es "<evaluacion>_<estudiante>", así que corregir una nota la sobrescribe.
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun guardarNotas(notas: List<Calificacion>)
 
-    // Notas que el docente dejó en blanco al corregir: se eliminan.
-    @Query("DELETE FROM calificaciones WHERE evaluacionId = :evaluacionId AND estudianteId IN (:estudianteIds)")
-    suspend fun eliminarNotas(evaluacionId: String, estudianteIds: List<String>)
+    @Query("DELETE FROM calificaciones WHERE evaluacionId = :evaluacionId")
+    suspend fun eliminarNotasDe(evaluacionId: String)
 }
 
-/** Módulo "Hoja de vida": solo se agregan anotaciones (no se editan ni borran). */
+/** Módulo "Hoja de vida". */
 @Dao
 interface AnotacionDao {
 
     @Query("SELECT * FROM anotaciones ORDER BY fechaHora DESC")
     fun todas(): Flow<List<Anotacion>>
 
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertar(anotacion: Anotacion)
 
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertarTodas(anotaciones: List<Anotacion>)
+
+    @Delete
+    suspend fun eliminar(anotacion: Anotacion)
+
+    @Query("DELETE FROM anotaciones")
+    suspend fun eliminarTodas()
 }
 
 /**

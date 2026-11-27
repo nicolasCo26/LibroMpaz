@@ -19,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -26,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import com.librompaz.app.ui.components.AvisoServidor
 import com.librompaz.app.ui.components.BarraSuperior
 import com.librompaz.app.viewmodel.LibroMpazViewModel
 
@@ -40,6 +42,9 @@ fun RevisionCalificacionesScreen(navController: NavHostController, viewModel: Li
     val desfases by viewModel.desfases.collectAsState()
     val estudiantes by viewModel.estudiantes.collectAsState()
 
+    // Trae de los microservicios las notas y anotaciones más recientes.
+    LaunchedEffect(Unit) { viewModel.sincronizar() }
+
     Scaffold(topBar = { BarraSuperior("Revisión de calificaciones", navController) }) { padding ->
         Column(
             modifier = Modifier
@@ -49,6 +54,7 @@ fun RevisionCalificacionesScreen(navController: NavHostController, viewModel: Li
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            AvisoServidor(viewModel)
             Text("Desfases u omisiones detectados (${desfases.size})", style = MaterialTheme.typography.titleSmall)
             if (desfases.isEmpty()) {
                 Text("Sin alertas: todas las cargas tienen evaluaciones con notas completas.", style = MaterialTheme.typography.bodySmall)
