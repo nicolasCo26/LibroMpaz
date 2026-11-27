@@ -3,33 +3,43 @@ package com.librompaz.app.ui.screen.docente
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import com.librompaz.app.model.Anotacion
 import com.librompaz.app.model.Estudiante
 import com.librompaz.app.model.TipoAnotacion
 import com.librompaz.app.ui.components.AvisoExito
+import com.librompaz.app.ui.components.AvisoServidor
 import com.librompaz.app.ui.components.BarraSuperior
 import com.librompaz.app.ui.components.SelectorDesplegable
 import com.librompaz.app.ui.components.textoError
@@ -40,7 +50,10 @@ import com.librompaz.app.viewmodel.LibroMpazViewModel
  * Módulo "Hoja de vida" (docente, RF-10): registrar anotaciones positivas, negativas u
  * observaciones conductuales de un estudiante, y ver su historial. Cada anotación queda con
  * marca temporal y "firma" del docente responsable (usuario + fecha + hora), después de una
- * confirmación explícita. Una vez registrada no se puede modificar.
+ * confirmación explícita. Solo quien la firmó puede corregirla o eliminarla.
+ *
+ * Los datos viven en el microservicio ms-anotaciones: registrar (POST), corregir (PUT) y
+ * eliminar (DELETE) pasan por él, y al abrir la pantalla se sincroniza (GET).
  */
 @Composable
 fun HojaDeVidaScreen(navController: NavHostController, viewModel: LibroMpazViewModel) {
@@ -57,6 +70,10 @@ fun HojaDeVidaScreen(navController: NavHostController, viewModel: LibroMpazViewM
     var confirmando by remember { mutableStateOf(false) }
     var mensaje by remember { mutableStateOf<String?>(null) }
     val historial = remember(todas, estudiante) { viewModel.anotacionesDe(estudiante?.id) }
+    var editando by remember { mutableStateOf<Anotacion?>(null) }
+    var eliminando by remember { mutableStateOf<Anotacion?>(null) }
+
+    LaunchedEffect(Unit) { viewModel.sincronizar() }
 
     Scaffold(topBar = { BarraSuperior("Hoja de vida", navController) }) { padding ->
         Column(
@@ -67,6 +84,7 @@ fun HojaDeVidaScreen(navController: NavHostController, viewModel: LibroMpazViewM
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            AvisoServidor(viewModel)
             SelectorDesplegable(
                 etiqueta = "Estudiante",
                 opciones = estudiantes,
@@ -132,10 +150,21 @@ fun HojaDeVidaScreen(navController: NavHostController, viewModel: LibroMpazViewM
                     colors = CardDefaults.cardColors(containerColor = color),
                     modifier = Modifier.fillMaxWidth().animateContentSize()
                 ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text(anotacion.tipo.etiqueta, style = MaterialTheme.typography.titleSmall)
-                        Text(anotacion.descripcion, style = MaterialTheme.typography.bodySmall)
-                        Text("${anotacion.fechaHora} · Firmó: ${anotacion.firmadoPor}", style = MaterialTheme.typography.labelSmall)
+                    Row(modifier = Modifier.padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f).padding(vertical = 12.dp)) {
+                            Text(anotacion.tipo.etiqueta, style = MaterialTheme.typography.titleSmall)
+                            Text(anotacion.descripcion, style = MaterialTheme.typography.bodySmall)
+                            Text("${anotacion.fechaHora} · Firmó: ${anotacion.firmadoPor}", style = MaterialTheme.typography.labelSmall)
+                        }
+                        // Solo quien firmó ve los botones (el microservicio también lo valida: 403).
+                        if (viewModel.puedeModificar(anotacion)) {
+                            IconButton(onClick = { editando = anotacion }) {
+                                Icon(Icons.Filled.Edit, contentDescription = "Corregir anotación")
+                            }
+                            IconButton(onClick = { eliminando = anotacion }) {
+                                Icon(Icons.Filled.Delete, contentDescription = "Eliminar anotación", tint = MaterialTheme.colorScheme.error)
+                            }
+                        }
                     }
                 }
             }
@@ -146,7 +175,7 @@ fun HojaDeVidaScreen(navController: NavHostController, viewModel: LibroMpazViewM
         AlertDialog(
             onDismissRequest = { confirmando = false },
             title = { Text("¿Registrar anotación?") },
-            text = { Text("Quedará firmada con tu usuario, fecha y hora, y no se podrá modificar.") },
+            text = { Text("Quedará firmada con tu usuario, fecha y hora. Solo tú podrás corregirla o eliminarla.") },
             confirmButton = {
                 TextButton(onClick = {
                     confirmando = false
@@ -166,4 +195,84 @@ fun HojaDeVidaScreen(navController: NavHostController, viewModel: LibroMpazViewM
             }
         )
     }
+
+    editando?.let { anotacion ->
+        DialogoCorregirAnotacion(
+            anotacion = anotacion,
+            onGuardar = { nuevoTipo, nuevaDescripcion ->
+                viewModel.actualizarAnotacion(anotacion, nuevoTipo, nuevaDescripcion) {
+                    editando = null
+                    mensaje = "Anotación corregida."
+                }
+            },
+            onCancelar = { editando = null }
+        )
+    }
+
+    eliminando?.let { anotacion ->
+        AlertDialog(
+            onDismissRequest = { eliminando = null },
+            title = { Text("¿Eliminar anotación?") },
+            text = { Text("Se eliminará \"${anotacion.descripcion}\". La eliminación queda registrada en la auditoría.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    eliminando = null
+                    viewModel.eliminarAnotacion(anotacion) { mensaje = "Anotación eliminada." }
+                }) { Text("Eliminar", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { eliminando = null }) { Text("Cancelar") }
+            }
+        )
+    }
+}
+
+/** Diálogo para corregir tipo y descripción (PUT /api/anotaciones/{id}). La firma original no cambia. */
+@Composable
+private fun DialogoCorregirAnotacion(
+    anotacion: Anotacion,
+    onGuardar: (TipoAnotacion?, String) -> ErroresAnotacion,
+    onCancelar: () -> Unit
+) {
+    var tipo by remember { mutableStateOf<TipoAnotacion?>(anotacion.tipo) }
+    var descripcion by remember { mutableStateOf(anotacion.descripcion) }
+    var errores by remember { mutableStateOf(ErroresAnotacion()) }
+
+    AlertDialog(
+        onDismissRequest = onCancelar,
+        title = { Text("Corregir anotación") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SelectorDesplegable(
+                    etiqueta = "Tipo de anotación",
+                    opciones = TipoAnotacion.entries,
+                    seleccion = tipo,
+                    textoDe = { it.etiqueta },
+                    onSeleccion = {
+                        tipo = it
+                        errores = errores.copy(tipo = null)
+                    },
+                    error = errores.tipo
+                )
+                OutlinedTextField(
+                    value = descripcion,
+                    onValueChange = {
+                        descripcion = it
+                        errores = errores.copy(descripcion = null)
+                    },
+                    label = { Text("Descripción") },
+                    minLines = 3,
+                    isError = errores.descripcion != null,
+                    supportingText = textoError(errores.descripcion),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { errores = onGuardar(tipo, descripcion) }) { Text("Guardar cambios") }
+        },
+        dismissButton = {
+            TextButton(onClick = onCancelar) { Text("Cancelar") }
+        }
+    )
 }

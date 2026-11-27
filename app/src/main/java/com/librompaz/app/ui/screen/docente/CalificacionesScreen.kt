@@ -17,6 +17,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
@@ -29,6 +30,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,11 +39,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.librompaz.app.model.Evaluacion
 import com.librompaz.app.ui.components.AvisoExito
+import com.librompaz.app.ui.components.AvisoServidor
 import com.librompaz.app.ui.components.BarraSuperior
 import com.librompaz.app.ui.components.CampoFecha
 import com.librompaz.app.ui.components.SelectorDesplegable
@@ -55,6 +59,9 @@ import com.librompaz.app.viewmodel.LibroMpazViewModel
  * notas de cada estudiante (escala chilena 1,0 a 7,0). Cada nota se valida mientras se escribe
  * (el error aparece bajo el campo). Pide confirmación antes de sobrescribir notas o de eliminar
  * una evaluación (RNF-02).
+ *
+ * Los datos viven en el microservicio ms-calificaciones: crear (POST), corregir (PUT), eliminar
+ * (DELETE) y guardar notas (PUT) pasan por él. Al abrir la pantalla se sincroniza (GET).
  */
 @Composable
 fun CalificacionesScreen(navController: NavHostController, viewModel: LibroMpazViewModel) {
@@ -66,19 +73,25 @@ fun CalificacionesScreen(navController: NavHostController, viewModel: LibroMpazV
     val evaluaciones = remember(todas, cursoId, asignaturaId) { viewModel.evaluacionesDe(cursoId, asignaturaId) }
     val estudiantes = remember(todos, cursoId) { viewModel.estudiantesDelCurso(cursoId) }
 
-    var evaluacion by remember { mutableStateOf<Evaluacion?>(null) }
+    // Se guarda el id elegido: así, al corregir o sincronizar, se muestra la versión nueva.
+    var evaluacionId by rememberSaveable { mutableStateOf<String?>(null) }
+    val evaluacion = evaluaciones.find { it.id == evaluacionId }
     var nuevoNombre by rememberSaveable { mutableStateOf("") }
     var nuevaFecha by rememberSaveable { mutableStateOf(hoy()) }
     var erroresEvaluacion by remember { mutableStateOf(ErroresEvaluacion()) }
 
     // Notas escritas (idEstudiante -> texto). Parten con lo ya guardado de la evaluación elegida.
     val guardadas = remember(todasLasNotas, evaluacion) { viewModel.calificacionesDe(evaluacion?.id) }
-    var notas by remember(evaluacion) {
+    var notas by remember(evaluacionId, guardadas) {
         mutableStateOf(guardadas.associate { it.estudianteId to it.nota.toString().replace('.', ',') })
     }
     var confirmandoNotas by remember { mutableStateOf(false) }
     var confirmandoEliminar by remember { mutableStateOf(false) }
+    var editando by remember { mutableStateOf(false) }
     var mensaje by remember { mutableStateOf<String?>(null) }
+
+    // GET al microservicio cada vez que se entra: muestra los cambios hechos desde otro equipo.
+    LaunchedEffect(Unit) { viewModel.sincronizar() }
 
     Scaffold(topBar = { BarraSuperior("Calificaciones", navController) }) { padding ->
         Column(
@@ -89,6 +102,7 @@ fun CalificacionesScreen(navController: NavHostController, viewModel: LibroMpazV
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            AvisoServidor(viewModel)
             Text("Nueva evaluación", style = MaterialTheme.typography.titleSmall)
             OutlinedTextField(
                 value = nuevoNombre,
@@ -101,7 +115,7 @@ fun CalificacionesScreen(navController: NavHostController, viewModel: LibroMpazV
                 singleLine = true,
                 isError = erroresEvaluacion.nombre != null,
                 supportingText = textoError(erroresEvaluacion.nombre),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().testTag("campo_nombre_evaluacion")
             )
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 CampoFecha(
@@ -130,11 +144,14 @@ fun CalificacionesScreen(navController: NavHostController, viewModel: LibroMpazV
                     opciones = evaluaciones,
                     seleccion = evaluacion,
                     textoDe = { "${it.nombreInstrumento} (${it.fecha})" },
-                    onSeleccion = { evaluacion = it },
+                    onSeleccion = { evaluacionId = it.id },
                     textoVacio = if (evaluaciones.isEmpty()) "Aún no hay evaluaciones" else "Elige una evaluación",
                     modifier = Modifier.weight(1f)
                 )
                 if (evaluacion != null) {
+                    IconButton(onClick = { editando = true }) {
+                        Icon(Icons.Filled.Edit, contentDescription = "Editar evaluación")
+                    }
                     IconButton(onClick = { confirmandoEliminar = true }) {
                         Icon(Icons.Filled.Delete, contentDescription = "Eliminar evaluación", tint = MaterialTheme.colorScheme.error)
                     }
@@ -216,7 +233,7 @@ fun CalificacionesScreen(navController: NavHostController, viewModel: LibroMpazV
                     confirmandoEliminar = false
                     evaluacion?.let {
                         viewModel.eliminarEvaluacion(it) {
-                            evaluacion = null
+                            evaluacionId = null
                             mensaje = "Evaluación eliminada."
                         }
                     }
@@ -227,4 +244,67 @@ fun CalificacionesScreen(navController: NavHostController, viewModel: LibroMpazV
             }
         )
     }
+
+    if (editando) {
+        evaluacion?.let { actual ->
+            DialogoEditarEvaluacion(
+                evaluacion = actual,
+                onGuardar = { nombre, fecha ->
+                    viewModel.actualizarEvaluacion(actual, nombre, fecha) {
+                        editando = false
+                        mensaje = "Evaluación corregida."
+                    }
+                },
+                onCancelar = { editando = false }
+            )
+        }
+    }
+}
+
+/** Diálogo para corregir el nombre y la fecha de una evaluación (PUT /api/evaluaciones/{id}). */
+@Composable
+private fun DialogoEditarEvaluacion(
+    evaluacion: Evaluacion,
+    onGuardar: (nombre: String, fecha: String) -> ErroresEvaluacion,
+    onCancelar: () -> Unit
+) {
+    var nombre by remember { mutableStateOf(evaluacion.nombreInstrumento) }
+    var fecha by remember { mutableStateOf(evaluacion.fecha) }
+    var errores by remember { mutableStateOf(ErroresEvaluacion()) }
+
+    AlertDialog(
+        onDismissRequest = onCancelar,
+        title = { Text("Editar evaluación") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = nombre,
+                    onValueChange = {
+                        nombre = it
+                        errores = errores.copy(nombre = null)
+                    },
+                    label = { Text("Nombre del instrumento") },
+                    singleLine = true,
+                    isError = errores.nombre != null,
+                    supportingText = textoError(errores.nombre),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                CampoFecha(
+                    etiqueta = "Fecha",
+                    fecha = fecha,
+                    onFechaChange = {
+                        fecha = it
+                        errores = errores.copy(fecha = null)
+                    },
+                    error = errores.fecha
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { errores = onGuardar(nombre, fecha) }) { Text("Guardar cambios") }
+        },
+        dismissButton = {
+            TextButton(onClick = onCancelar) { Text("Cancelar") }
+        }
+    )
 }
