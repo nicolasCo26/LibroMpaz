@@ -28,6 +28,7 @@ import com.librompaz.app.ui.screen.inspectoria.PanelInspectoriaScreen
 import com.librompaz.app.ui.screen.utp.CoberturaCurricularScreen
 import com.librompaz.app.ui.screen.utp.PanelUtpScreen
 import com.librompaz.app.ui.screen.utp.RevisionCalificacionesScreen
+import com.librompaz.app.viewmodel.FeriadosViewModel
 import com.librompaz.app.viewmodel.LibroMpazViewModel
 
 object Rutas {
@@ -62,7 +63,8 @@ object Rutas {
  *                        ──> INSPECTORÍA: Panel ──> Asistencia (cualquier curso) | Alertas
  *                        ──> DIRECCIÓN: Panel ──> Auditoría
  *
- * El curso y la asignatura elegidos se comparten a través del ViewModel.
+ * El curso y la asignatura elegidos se comparten a través del ViewModel. FeriadosViewModel (API
+ * externa) también se crea una sola vez aquí y se pasa a las pantallas que muestran feriados.
  * Regla de negocio: no existe ningún acceso para estudiantes ni apoderados.
  *
  * Botón atrás: el atrás nativo de Android funciona solo (lo maneja el NavHost). Al ingresar,
@@ -74,7 +76,8 @@ object Rutas {
 @Composable
 fun AppNavigation(
     navController: NavHostController = rememberNavController(),
-    viewModel: LibroMpazViewModel = viewModel()
+    viewModel: LibroMpazViewModel = viewModel(),
+    feriadosViewModel: FeriadosViewModel = viewModel()
 ) {
     val usuario by viewModel.usuarioActivo.collectAsState()
 
@@ -132,12 +135,12 @@ fun AppNavigation(
         }
 
         // ---- Docente ----
-        composable(Rutas.DOC_CURSOS) { protegida(Perfil.DOCENTE) { MisCursosScreen(navController, viewModel, onCerrarSesion = cerrarSesion) } }
+        composable(Rutas.DOC_CURSOS) { protegida(Perfil.DOCENTE) { MisCursosScreen(navController, viewModel, feriadosViewModel, onCerrarSesion = cerrarSesion) } }
         composable(Rutas.DOC_CURSO) { protegida(Perfil.DOCENTE) { CursoDocenteScreen(navController, viewModel) } }
         composable(Rutas.DOC_CLASE) { protegida(Perfil.DOCENTE) { RegistroClaseScreen(navController, viewModel) } }
         composable(Rutas.DOC_CALIFICACIONES) { protegida(Perfil.DOCENTE) { CalificacionesScreen(navController, viewModel) } }
         composable(Rutas.DOC_HOJA_VIDA) { protegida(Perfil.DOCENTE) { HojaDeVidaScreen(navController, viewModel) } }
-        composable(Rutas.ASISTENCIA) { protegida(Perfil.DOCENTE, Perfil.INSPECTORIA) { AsistenciaScreen(navController, viewModel) } }
+        composable(Rutas.ASISTENCIA) { protegida(Perfil.DOCENTE, Perfil.INSPECTORIA) { AsistenciaScreen(navController, viewModel, feriadosViewModel) } }
 
         // ---- UTP ----
         composable(Rutas.UTP_PANEL) { protegida(Perfil.UTP) { PanelUtpScreen(navController, viewModel, onCerrarSesion = cerrarSesion) } }
@@ -145,7 +148,7 @@ fun AppNavigation(
         composable(Rutas.UTP_CALIFICACIONES) { protegida(Perfil.UTP) { RevisionCalificacionesScreen(navController, viewModel) } }
 
         // ---- Inspectoría ----
-        composable(Rutas.INSP_PANEL) { protegida(Perfil.INSPECTORIA) { PanelInspectoriaScreen(navController, viewModel, onCerrarSesion = cerrarSesion) } }
+        composable(Rutas.INSP_PANEL) { protegida(Perfil.INSPECTORIA) { PanelInspectoriaScreen(navController, viewModel, feriadosViewModel, onCerrarSesion = cerrarSesion) } }
         composable(Rutas.INSP_ALERTAS) { protegida(Perfil.INSPECTORIA) { AlertasInspectoriaScreen(navController, viewModel) } }
 
         // ---- Dirección ----

@@ -39,6 +39,7 @@ import com.librompaz.app.ui.components.AvisoExito
 import com.librompaz.app.ui.components.BarraSuperior
 import com.librompaz.app.ui.components.CampoFecha
 import com.librompaz.app.util.hoy
+import com.librompaz.app.viewmodel.FeriadosViewModel
 import com.librompaz.app.viewmodel.LibroMpazViewModel
 
 /**
@@ -50,9 +51,15 @@ import com.librompaz.app.viewmodel.LibroMpazViewModel
  * Al cambiar la fecha se carga lo ya registrado ese día (se puede corregir). Pide confirmación
  * antes de guardar si va a sobrescribir un registro (RNF-02).
  * Supuesto: se permite corregir días anteriores, y queda auditado.
+ *
+ * Si la fecha es feriado (API externa de feriados) se muestra un aviso; no bloquea el registro.
  */
 @Composable
-fun AsistenciaScreen(navController: NavHostController, viewModel: LibroMpazViewModel) {
+fun AsistenciaScreen(
+    navController: NavHostController,
+    viewModel: LibroMpazViewModel,
+    feriadosViewModel: FeriadosViewModel
+) {
     val cursoId by viewModel.cursoSeleccionadoId.collectAsState()
     val cursos by viewModel.cursos.collectAsState()
     val todos by viewModel.estudiantes.collectAsState()
@@ -66,6 +73,8 @@ fun AsistenciaScreen(navController: NavHostController, viewModel: LibroMpazViewM
     var cargando by remember { mutableStateOf(true) }
     var confirmando by remember { mutableStateOf(false) }
     var mensaje by remember { mutableStateOf<String?>(null) }
+    val estadoFeriados by feriadosViewModel.uiState.collectAsState()
+    val feriado = remember(estadoFeriados, fecha) { feriadosViewModel.feriadoEn(fecha) }
 
     // Cada vez que cambia el curso o la fecha, se lee desde Room lo ya registrado.
     LaunchedEffect(cursoId, fecha) {
@@ -108,6 +117,14 @@ fun AsistenciaScreen(navController: NavHostController, viewModel: LibroMpazViewM
                 color = if (yaRegistrada) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp)
             )
+            feriado?.let {
+                Text(
+                    "Este día es feriado: ${it.localName}. Normalmente no hay clases.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
 
             // Resumen del día (se actualiza al tocar cada estado).
             Row(
