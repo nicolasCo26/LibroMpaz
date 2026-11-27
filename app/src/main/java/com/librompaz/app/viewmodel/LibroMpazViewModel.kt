@@ -24,6 +24,8 @@ import com.librompaz.app.model.Usuario
 import com.librompaz.app.recursosnativos.ExportadorCsv
 import com.librompaz.app.util.ahora
 import com.librompaz.app.util.hoy
+import java.io.IOException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -51,16 +53,18 @@ data class LoginUiState(
  * Guarda el estado de las pantallas y decide QUÉ hacer (validar, guardar, calcular métricas).
  * No sabe CÓMO se guardan los datos: eso es trabajo de LibroMpazRepository.
  *
- * Flujo de un dato: Pantalla (@Composable) -> ViewModel (valida) -> Repository -> DAO -> Room.
- * Y de vuelta: Room emite un Flow -> el ViewModel lo expone como StateFlow -> la pantalla lo
- * observa con collectAsState() y se redibuja sola.
+ * Flujo de un dato: Pantalla (@Composable) -> ViewModel (valida) -> Repository -> microservicio
+ * (Retrofit) y/o DAO -> Room. Y de vuelta: Room emite un Flow -> el ViewModel lo expone como
+ * StateFlow -> la pantalla lo observa con collectAsState() y se redibuja sola.
  *
  * Es AndroidViewModel porque necesita un Context para abrir la base de datos y escribir el
- * archivo del reporte.
+ * archivo del reporte. El repositorio llega por el constructor para poder usar un mock en las
+ * pruebas; @JvmOverloads crea además el constructor (Application) que usa viewModel().
  */
-class LibroMpazViewModel(application: Application) : AndroidViewModel(application) {
-
-    private val repository = LibroMpazRepository(AppDatabase.getInstance(application))
+class LibroMpazViewModel @JvmOverloads constructor(
+    application: Application,
+    private val repository: LibroMpazRepository = LibroMpazRepository.crear(AppDatabase.getInstance(application))
+) : AndroidViewModel(application) {
 
     /** false mientras se pobla la base la primera vez (el login muestra un indicador de carga). */
     private val _datosListos = MutableStateFlow(false)
@@ -70,6 +74,7 @@ class LibroMpazViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             repository.poblarSiVacia()
             _datosListos.value = true
+            sincronizar()
         }
     }
 
@@ -80,6 +85,65 @@ class LibroMpazViewModel(application: Application) : AndroidViewModel(applicatio
      */
     private fun <T> Flow<List<T>>.comoEstado(): StateFlow<List<T>> =
         stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    // =====================================================================
+    // Conexión con los microservicios (persistencia remota)
+    // =====================================================================
+
+    /** true = el último contacto con los microservicios funcionó; false = falló; null = aún no se sabe. */
+    private val _conectado = MutableStateFlow<Boolean?>(null)
+    val conectado: StateFlow<Boolean?> = _conectado.asStateFlow()
+
+    private val _sincronizando = MutableStateFlow(false)
+    val sincronizando: StateFlow<Boolean> = _sincronizando.asStateFlow()
+
+    /** Último error al hablar con un microservicio (las pantallas lo muestran en rojo). */
+    private val _errorServidor = MutableStateFlow<String?>(null)
+    val errorServidor: StateFlow<String?> = _errorServidor.asStateFlow()
+
+    fun limpiarErrorServidor() {
+        _errorServidor.value = null
+    }
+
+    /**
+     * GET a los microservicios: trae evaluaciones, notas y anotaciones y actualiza la copia local.
+     * Se llama al abrir la app, al ingresar y al entrar a cada pantalla que usa esos datos.
+     */
+    fun sincronizar() {
+        viewModelScope.launch {
+            _sincronizando.value = true
+            try {
+                repository.sincronizar()
+                _conectado.value = true
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _conectado.value = false
+            } finally {
+                _sincronizando.value = false
+            }
+        }
+    }
+
+    /**
+     * Ejecuta una escritura que pasa por un microservicio. Si responde bien, llama a alTerminar();
+     * si falla (sin red, 400, 403...), deja el mensaje en errorServidor y no se guarda nada.
+     */
+    private fun enServidor(accion: suspend () -> Unit, alTerminar: () -> Unit) {
+        viewModelScope.launch {
+            try {
+                accion()
+                _conectado.value = true
+                _errorServidor.value = null
+                alTerminar()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (e is IOException) _conectado.value = false
+                _errorServidor.value = mensajeDeError(e)
+            }
+        }
+    }
 
     // =====================================================================
     // Módulo "Autenticación y alcance por rol" (RF-01, RF-02)
@@ -120,6 +184,7 @@ class LibroMpazViewModel(application: Application) : AndroidViewModel(applicatio
             _usuarioActivo.value = usuario
             _login.value = LoginUiState()   // limpia el formulario: la clave no queda en memoria
             onIngresar(usuario.perfil)
+            sincronizar()
         }
     }
 
@@ -277,10 +342,24 @@ class LibroMpazViewModel(application: Application) : AndroidViewModel(applicatio
 
         val nombre = nombreInstrumento.trim()
         val detalle = "Evaluación \"$nombre\" ${cursoPorId(cursoId)?.nombre}, ${asignaturaPorId(asignaturaId)?.nombre}"
-        viewModelScope.launch {
-            repository.crearEvaluacion(usuario, cursoId, asignaturaId, nombre, fecha, detalle)
-            alTerminar()
-        }
+        enServidor({ repository.crearEvaluacion(usuario, cursoId, asignaturaId, nombre, fecha, detalle) }, alTerminar)
+        return errores
+    }
+
+    /** Corrige el nombre o la fecha de una evaluación (PUT al microservicio). */
+    fun actualizarEvaluacion(
+        evaluacion: Evaluacion,
+        nombreInstrumento: String,
+        fecha: String,
+        alTerminar: () -> Unit
+    ): ErroresEvaluacion {
+        val errores = validarEvaluacion(nombreInstrumento, fecha, hoy())
+        val usuario = _usuarioActivo.value
+        if (errores.hayErrores || usuario == null || !tieneCarga(evaluacion.cursoId, evaluacion.asignaturaId)) return errores
+
+        val editada = evaluacion.copy(nombreInstrumento = nombreInstrumento.trim(), fecha = fecha)
+        val detalle = "Evaluación \"${evaluacion.nombreInstrumento}\" corregida a \"${editada.nombreInstrumento}\" (${editada.fecha})"
+        enServidor({ repository.actualizarEvaluacion(usuario, editada, detalle) }, alTerminar)
         return errores
     }
 
@@ -305,10 +384,7 @@ class LibroMpazViewModel(application: Application) : AndroidViewModel(applicatio
         if (validas.isEmpty() && sinNota.isEmpty()) return errores
 
         val detalle = "Notas de \"${evaluacion.nombreInstrumento}\" ${cursoPorId(evaluacion.cursoId)?.nombre} (${validas.size} notas)"
-        viewModelScope.launch {
-            repository.guardarCalificaciones(usuario, evaluacion.id, validas, sinNota, detalle)
-            alTerminar()
-        }
+        enServidor({ repository.guardarCalificaciones(usuario, evaluacion.id, validas, detalle) }, alTerminar)
         return errores
     }
 
@@ -317,10 +393,7 @@ class LibroMpazViewModel(application: Application) : AndroidViewModel(applicatio
         val usuario = _usuarioActivo.value ?: return
         if (!tieneCarga(evaluacion.cursoId, evaluacion.asignaturaId)) return
         val detalle = "Evaluación \"${evaluacion.nombreInstrumento}\" ${cursoPorId(evaluacion.cursoId)?.nombre} y sus notas"
-        viewModelScope.launch {
-            repository.eliminarEvaluacion(usuario, evaluacion, detalle)
-            alTerminar()
-        }
+        enServidor({ repository.eliminarEvaluacion(usuario, evaluacion, detalle) }, alTerminar)
     }
 
     /** Desfases u omisiones en el registro de notas, para UTP. */
@@ -355,10 +428,33 @@ class LibroMpazViewModel(application: Application) : AndroidViewModel(applicatio
         val usuario = _usuarioActivo.value ?: return
         if (validarNuevaAnotacion(estudiante, tipo, descripcion).hayErrores || !tieneCarga(estudiante.cursoId)) return
         val detalle = "${tipo.etiqueta} a ${estudiante.nombreFicticio}"
-        viewModelScope.launch {
-            repository.registrarAnotacion(usuario, estudiante.id, tipo, descripcion.trim(), detalle)
-            alTerminar()
-        }
+        enServidor({ repository.registrarAnotacion(usuario, estudiante.id, tipo, descripcion.trim(), detalle) }, alTerminar)
+    }
+
+    /** Solo quien firmó la anotación puede corregirla o eliminarla (el microservicio lo vuelve a revisar). */
+    fun puedeModificar(anotacion: Anotacion): Boolean = anotacion.firmadoPor == _usuarioActivo.value?.nombre
+
+    /** Corrige el tipo y la descripción (PUT). La firma original (quién y cuándo) no cambia. */
+    fun actualizarAnotacion(
+        anotacion: Anotacion,
+        tipo: TipoAnotacion?,
+        descripcion: String,
+        alTerminar: () -> Unit
+    ): ErroresAnotacion {
+        val errores = validarAnotacion(true, tipo != null, descripcion)
+        val usuario = _usuarioActivo.value
+        if (errores.hayErrores || tipo == null || usuario == null || !puedeModificar(anotacion)) return errores
+        val detalle = "Anotación de ${estudiantePorId(anotacion.estudianteId)?.nombreFicticio} corregida (${tipo.etiqueta})"
+        enServidor({ repository.actualizarAnotacion(usuario, anotacion, tipo, descripcion.trim(), detalle) }, alTerminar)
+        return errores
+    }
+
+    /** Elimina la anotación (DELETE). La pantalla pide confirmación antes (RNF-02). */
+    fun eliminarAnotacion(anotacion: Anotacion, alTerminar: () -> Unit) {
+        val usuario = _usuarioActivo.value ?: return
+        if (!puedeModificar(anotacion)) return
+        val detalle = "${anotacion.tipo.etiqueta} de ${estudiantePorId(anotacion.estudianteId)?.nombreFicticio} eliminada"
+        enServidor({ repository.eliminarAnotacion(usuario, anotacion, detalle) }, alTerminar)
     }
 
     /** Anotaciones negativas de estudiantes que requieren intervención de Inspectoría. */
