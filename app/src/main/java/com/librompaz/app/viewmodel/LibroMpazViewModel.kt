@@ -70,14 +70,6 @@ class LibroMpazViewModel @JvmOverloads constructor(
     private val _datosListos = MutableStateFlow(false)
     val datosListos: StateFlow<Boolean> = _datosListos.asStateFlow()
 
-    init {
-        viewModelScope.launch {
-            repository.poblarSiVacia()
-            _datosListos.value = true
-            sincronizar()
-        }
-    }
-
     /**
      * Convierte un Flow de Room en StateFlow. Eagerly: empieza a escuchar de inmediato y no se
      * detiene, así .value siempre está al día (las funciones de abajo como cursoPorId() lo leen).
@@ -103,6 +95,16 @@ class LibroMpazViewModel @JvmOverloads constructor(
 
     fun limpiarErrorServidor() {
         _errorServidor.value = null
+    }
+
+    // Va DESPUÉS de declarar el estado de conexión: si la corrutina corre de inmediato,
+    // sincronizar() ya encuentra _sincronizando y _conectado creados.
+    init {
+        viewModelScope.launch {
+            repository.poblarSiVacia()
+            _datosListos.value = true
+            sincronizar()
+        }
     }
 
     /**
