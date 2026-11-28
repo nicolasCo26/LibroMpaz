@@ -106,7 +106,7 @@ Si los microservicios están apagados la app no se cae: muestra la última copia
 | `FeriadosViewModelTest` | Estados Cargando / Éxito / Error de la API externa y próximos feriados | `FeriadosApi` y `FeriadosRepository` |
 | `ErroresRedTest`, `ValidacionesTest`, `MetricasTest` | Reglas puras (sin mocks) | — |
 
-Resultado: **65 pruebas, 0 fallos**. Cobertura de la lógica (`viewmodel` + `data.repository`): **97 % de líneas**.
+Resultado: **66 pruebas, 0 fallos**. Cobertura de la lógica (`viewmodel` + `data.repository`): **97 % de líneas**.
 
 ### De interfaz (instrumentadas, se ven en el emulador) — `app/src/androidTest`
 
