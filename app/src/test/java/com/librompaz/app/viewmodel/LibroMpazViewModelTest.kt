@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -113,6 +114,15 @@ class LibroMpazViewModelTest : StringSpec({
             vm.conectado.value shouldBe false
             vm.sincronizando.value shouldBe false
         }
+    }
+
+    // Caso real del emulador: si la base ya estaba poblada, la corrutina del init corre de inmediato
+    // (sin suspender) y sincronizar() se ejecuta mientras el ViewModel todavía se está construyendo.
+    "se crea sin errores aunque la sincronización corra de inmediato" {
+        Dispatchers.setMain(UnconfinedTestDispatcher())
+        val vm = nuevoViewModel()
+        vm.datosListos.value shouldBe true
+        vm.conectado.value shouldBe true
     }
 
     "login con campos vacíos muestra los errores y no consulta el repositorio" {
